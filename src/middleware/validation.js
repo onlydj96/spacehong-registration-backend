@@ -3,6 +3,7 @@ import { parseMinutes } from '../utils/helpers.js';
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const ALLOWED_REFERRALS = ['스페이스클라우드', '아워플레이스', '네이버', '인스타', '기타'];
+const ALLOWED_VENUE_TYPES = ['performance', 'event', 'studio'];
 
 const MAX_PERFORMERS = 200;
 const MAX_OPERATOR_HOURS = 12;
@@ -12,14 +13,22 @@ const MAX_DESCRIPTION_LENGTH = 500;
 export function validateReservation(req, res, next) {
   const errors = [];
   const {
-    name, phone, rentalDate, startTime, endTime,
+    venueType, name, phone, rentalDate, startTime, endTime,
     numPerformers, description, referralSources, options
   } = req.body;
+
+  if (!venueType || !ALLOWED_VENUE_TYPES.includes(venueType)) {
+    errors.push('대관 유형을 선택해주세요.');
+  }
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     errors.push('성함은 필수입니다.');
   } else if (name.trim().length > MAX_NAME_LENGTH) {
     errors.push(`성함은 ${MAX_NAME_LENGTH}자 이내로 입력해주세요.`);
+  }
+
+  if (req.body.organization && typeof req.body.organization === 'string' && req.body.organization.trim().length > 200) {
+    errors.push('소속은 200자 이내로 입력해주세요.');
   }
 
   if (!phone) {
@@ -77,7 +86,13 @@ export function validateReservation(req, res, next) {
     }
   }
 
-  if (options) {
+  if (options && typeof options === 'object') {
+    const boolFields = ['extraCapacity', 'multitrack', 'personalMonitor', 'extraOperator', 'barOperation', 'prompter', 'taxInvoice'];
+    for (const field of boolFields) {
+      if (options[field] !== undefined && typeof options[field] !== 'boolean') {
+        errors.push(`옵션 "${field}"는 true/false 값이어야 합니다.`);
+      }
+    }
     if (options.extraOperator) {
       if (!options.extraOperatorHours || options.extraOperatorHours < 1) {
         errors.push('추가 오퍼레이터 선택 시 시간을 입력해주세요.');

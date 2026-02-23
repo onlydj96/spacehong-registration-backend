@@ -8,7 +8,7 @@ const router = Router();
 router.post('/', validateReservation, async (req, res, next) => {
   try {
     const {
-      name, organization, phone, rentalDate, startTime, endTime,
+      venueType, name, organization, phone, rentalDate, startTime, endTime,
       numPerformers, description, referralSources, options
     } = req.body;
 
@@ -16,6 +16,7 @@ router.post('/', validateReservation, async (req, res, next) => {
     const additionalPrice = calculatePrice(options || {});
 
     const insertData = {
+      venue_type: venueType,
       name: name.trim(),
       organization: organization?.trim() || null,
       phone: phone.replace(/[-\s]/g, ''),

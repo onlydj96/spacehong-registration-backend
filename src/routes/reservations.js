@@ -1,22 +1,9 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
 import { validateReservation } from '../middleware/validation.js';
+import { parseMinutes, calculatePrice } from '../utils/helpers.js';
 
 const router = Router();
-
-function parseMinutes(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function calculatePrice(options) {
-  let additional = 0;
-  if (options.extraCapacity) additional += 100000;
-  if (options.multitrack) additional += 100000;
-  if (options.personalMonitor) additional += 100000;
-  if (options.extraOperator) additional += 20000 * (options.extraOperatorHours || 1);
-  return additional;
-}
 
 router.post('/', validateReservation, async (req, res, next) => {
   try {

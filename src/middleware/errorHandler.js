@@ -1,5 +1,16 @@
 export function errorHandler(err, req, res, next) {
-  console.error('[Error]', err.message);
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (isDev) {
+    console.error('[Error]', err.message);
+  }
+
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      errors: ['요청 데이터가 너무 큽니다.'],
+    });
+  }
 
   if (err.code && err.message) {
     return res.status(500).json({

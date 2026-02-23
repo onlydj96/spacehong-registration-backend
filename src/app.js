@@ -1,10 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import healthRouter from './routes/health.js';
 import reservationsRouter from './routes/reservations.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
+
+app.use(helmet());
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
   .split(',')
@@ -14,10 +18,26 @@ app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST'],
 }));
-app.use(express.json());
+
+app.use(express.json({ limit: '10kb' }));
+
+const reservationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, errors: ['너무 많은 요청입니다. 잠시 후 다시 시도해주세요.'] },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.use('/api/health', healthRouter);
-app.use('/api/reservations', reservationsRouter);
+app.use('/api/reservations', reservationLimiter, reservationsRouter);
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    errors: ['요청하신 경로를 찾을 수 없습니다.'],
+  });
+});
 
 app.use(errorHandler);
 

@@ -1,21 +1,25 @@
+import { parseMinutes } from '../utils/helpers.js';
+
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const ALLOWED_REFERRALS = ['스페이스클라우드', '아워플레이스', '네이버', '인스타', '기타'];
 
-function parseMinutes(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
+const MAX_PERFORMERS = 200;
+const MAX_OPERATOR_HOURS = 12;
+const MAX_NAME_LENGTH = 50;
+const MAX_DESCRIPTION_LENGTH = 500;
 
 export function validateReservation(req, res, next) {
   const errors = [];
   const {
     name, phone, rentalDate, startTime, endTime,
-    numPerformers, referralSources, options
+    numPerformers, description, referralSources, options
   } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     errors.push('성함은 필수입니다.');
+  } else if (name.trim().length > MAX_NAME_LENGTH) {
+    errors.push(`성함은 ${MAX_NAME_LENGTH}자 이내로 입력해주세요.`);
   }
 
   if (!phone) {
@@ -31,6 +35,7 @@ export function validateReservation(req, res, next) {
     errors.push('대관날짜는 필수입니다.');
   } else {
     const date = new Date(rentalDate);
+    date.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (isNaN(date.getTime()) || date <= today) {
@@ -56,6 +61,12 @@ export function validateReservation(req, res, next) {
 
   if (!numPerformers || !Number.isInteger(numPerformers) || numPerformers < 1) {
     errors.push('공연자 인원은 1명 이상이어야 합니다.');
+  } else if (numPerformers > MAX_PERFORMERS) {
+    errors.push(`공연자 인원은 ${MAX_PERFORMERS}명 이하여야 합니다.`);
+  }
+
+  if (description && typeof description === 'string' && description.trim().length > MAX_DESCRIPTION_LENGTH) {
+    errors.push(`대관 설명은 ${MAX_DESCRIPTION_LENGTH}자 이내로 입력해주세요.`);
   }
 
   if (referralSources && Array.isArray(referralSources)) {
@@ -67,8 +78,12 @@ export function validateReservation(req, res, next) {
   }
 
   if (options) {
-    if (options.extraOperator && (!options.extraOperatorHours || options.extraOperatorHours < 1)) {
-      errors.push('추가 오퍼레이터 선택 시 시간을 입력해주세요.');
+    if (options.extraOperator) {
+      if (!options.extraOperatorHours || options.extraOperatorHours < 1) {
+        errors.push('추가 오퍼레이터 선택 시 시간을 입력해주세요.');
+      } else if (options.extraOperatorHours > MAX_OPERATOR_HOURS) {
+        errors.push(`추가 오퍼레이터 시간은 ${MAX_OPERATOR_HOURS}시간 이하여야 합니다.`);
+      }
     }
   }
 

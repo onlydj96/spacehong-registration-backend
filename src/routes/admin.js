@@ -359,42 +359,39 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
 });
 
 // GET /api/admin/stats - Get dashboard statistics
+// 최적화: 6개 쿼리 → 3개 쿼리 (각 테이블에서 모든 데이터를 한 번에 가져와 JS에서 처리)
 router.get('/stats', verifyAdmin, async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Get counts
+    // 3개 쿼리로 모든 데이터 가져오기 (병렬 실행)
     const [reservations, siteVisits, settlements] = await Promise.all([
-      supabase.from('reservations').select('id, status', { count: 'exact' }),
-      supabase.from('site_visits').select('id, status', { count: 'exact' }),
-      supabase.from('settlements').select('id, refund_status', { count: 'exact' }),
+      supabase.from('reservations').select('status, submitted_at'),
+      supabase.from('site_visits').select('status, submitted_at'),
+      supabase.from('settlements').select('refund_status, submitted_at'),
     ]);
 
-    // Get recent submissions (last 30 days)
-    const [recentReservations, recentSiteVisits, recentSettlements] = await Promise.all([
-      supabase.from('reservations').select('id', { count: 'exact' }).gte('submitted_at', thirtyDaysAgo),
-      supabase.from('site_visits').select('id', { count: 'exact' }).gte('submitted_at', thirtyDaysAgo),
-      supabase.from('settlements').select('id', { count: 'exact' }).gte('submitted_at', thirtyDaysAgo),
-    ]);
+    const reservationsData = reservations.data || [];
+    const siteVisitsData = siteVisits.data || [];
+    const settlementsData = settlements.data || [];
 
     res.json({
       success: true,
       data: {
         reservations: {
-          total: reservations.count || 0,
-          pending: reservations.data?.filter(r => r.status === 'pending').length || 0,
-          recent: recentReservations.count || 0,
+          total: reservationsData.length,
+          pending: reservationsData.filter(r => r.status === 'pending').length,
+          recent: reservationsData.filter(r => r.submitted_at >= thirtyDaysAgo).length,
         },
         siteVisits: {
-          total: siteVisits.count || 0,
-          pending: siteVisits.data?.filter(s => s.status === 'pending').length || 0,
-          recent: recentSiteVisits.count || 0,
+          total: siteVisitsData.length,
+          pending: siteVisitsData.filter(s => s.status === 'pending').length,
+          recent: siteVisitsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
         },
         settlements: {
-          total: settlements.count || 0,
-          pending: settlements.data?.filter(s => s.refund_status === 'pending').length || 0,
-          recent: recentSettlements.count || 0,
+          total: settlementsData.length,
+          pending: settlementsData.filter(s => s.refund_status === 'pending').length,
+          recent: settlementsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
         },
       },
     });

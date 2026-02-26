@@ -7,7 +7,7 @@ const router = Router();
 router.post('/', async (req, res, next) => {
   try {
     const {
-      name, rentalDate, bankInfo, accountNumber,
+      name, rentalDate, bankName, accountHolder, accountNumber,
       rating, goodPoints, improvements,
       mediaFiles, instagramConsent, instagramRequest
     } = req.body;
@@ -16,7 +16,8 @@ router.post('/', async (req, res, next) => {
     const errors = [];
     if (!name?.trim()) errors.push('성함을 입력해주세요.');
     if (!rentalDate) errors.push('대관날짜를 선택해주세요.');
-    if (!bankInfo?.trim()) errors.push('은행명과 예금주명을 입력해주세요.');
+    if (!bankName?.trim()) errors.push('은행명을 입력해주세요.');
+    if (!accountHolder?.trim()) errors.push('예금주명을 입력해주세요.');
     if (!accountNumber?.trim()) errors.push('계좌번호를 입력해주세요.');
     if (!rating || rating < 1 || rating > 5) errors.push('만족도를 선택해주세요.');
 
@@ -27,7 +28,8 @@ router.post('/', async (req, res, next) => {
     const insertData = {
       name: name.trim(),
       rental_date: rentalDate,
-      bank_info: bankInfo.trim(),
+      bank_name: bankName.trim(),
+      account_holder: accountHolder.trim(),
       account_number: accountNumber.trim(),
       rating,
       good_points: goodPoints?.trim() || null,

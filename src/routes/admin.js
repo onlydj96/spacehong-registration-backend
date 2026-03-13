@@ -30,13 +30,28 @@ const verifyAdmin = async (req, res, next) => {
 // GET /api/admin/reservations - Get all reservations with search
 router.get('/reservations', verifyAdmin, async (req, res, next) => {
   try {
-    const { search, startDate, endDate, status, page = 1, limit = 20 } = req.query;
+    const { search, startDate, endDate, status, tab = 'upcoming', page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
+    const today = new Date().toISOString().split('T')[0];
 
     let query = supabase
       .from('reservations')
-      .select('*', { count: 'exact' })
-      .order('submitted_at', { ascending: false });
+      .select('*', { count: 'exact' });
+
+    // Tab filtering: upcoming (today and future) vs past
+    if (tab === 'upcoming') {
+      query = query.gte('rental_date', today);
+      // Sort upcoming by rental_date ascending (soonest first)
+      query = query.order('rental_date', { ascending: true });
+      query = query.order('start_time', { ascending: true });
+    } else if (tab === 'past') {
+      query = query.lt('rental_date', today);
+      // Sort past by rental_date descending (most recent first)
+      query = query.order('rental_date', { ascending: false });
+    } else {
+      // Default: order by submitted_at
+      query = query.order('submitted_at', { ascending: false });
+    }
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,organization.ilike.%${search}%,phone.ilike.%${search}%`);

@@ -9,7 +9,8 @@ router.post('/', validateReservation, async (req, res, next) => {
   try {
     const {
       venueType, name, organization, phone, rentalDate, startTime, endTime,
-      numPerformers, description, referralSources, options
+      numPerformers, description, referralSources, referralOther, options,
+      signatureData, termsAgreed
     } = req.body;
 
     const rentalHours = (parseMinutes(endTime) - parseMinutes(startTime)) / 60;
@@ -27,6 +28,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       num_performers: numPerformers,
       description: description?.trim() || null,
       referral_sources: referralSources || [],
+      referral_other: referralOther?.trim() || null,
       opt_extra_capacity: options?.extraCapacity || false,
       opt_multitrack: options?.multitrack || false,
       opt_personal_monitor: options?.personalMonitor || false,
@@ -37,6 +39,9 @@ router.post('/', validateReservation, async (req, res, next) => {
       opt_tax_invoice: options?.taxInvoice || false,
       additional_price: additionalPrice,
       total_price: additionalPrice,
+      signature_data: signatureData || null,
+      terms_agreed: termsAgreed || false,
+      terms_agreed_at: termsAgreed ? new Date().toISOString() : null,
     };
 
     const { data, error } = await supabase

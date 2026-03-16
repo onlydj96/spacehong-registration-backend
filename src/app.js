@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import healthRouter from './routes/health.js';
 import reservationsRouter from './routes/reservations.js';
@@ -8,10 +9,13 @@ import siteVisitsRouter from './routes/siteVisits.js';
 import settlementsRouter from './routes/settlements.js';
 import adminRouter from './routes/admin.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requestLogger } from './middleware/logger.js';
 
 const app = express();
 
 app.use(helmet());
+app.use(compression());
+app.use(requestLogger);
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
   .split(',')
@@ -22,7 +26,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
 }));
 
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '5mb' }));
 
 const submissionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

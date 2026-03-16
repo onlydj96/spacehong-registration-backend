@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
+import { getCached, setCached, deleteCached, CACHE_KEYS } from '../utils/cache.js';
 
 const router = Router();
+
+const CACHE_TTL = {
+  STATS: 60,
+  STATISTICS: 300,
+  LIST: 30,
+};
 
 // Middleware to verify admin token
 const verifyAdmin = async (req, res, next) => {
@@ -130,6 +137,7 @@ router.patch('/reservations/:id', verifyAdmin, async (req, res, next) => {
 
     if (error) throw error;
 
+    deleteCached(CACHE_KEYS.STATISTICS);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -224,6 +232,7 @@ router.patch('/site-visits/:id', verifyAdmin, async (req, res, next) => {
 
     if (error) throw error;
 
+    deleteCached(CACHE_KEYS.STATISTICS);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -318,6 +327,7 @@ router.patch('/settlements/:id', verifyAdmin, async (req, res, next) => {
 
     if (error) throw error;
 
+    deleteCached(CACHE_KEYS.STATISTICS);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -373,15 +383,18 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/stats - Get dashboard statistics
-// 최적화: 6개 쿼리 → 3개 쿼리 (각 테이블에서 모든 데이터를 한 번에 가져와 JS에서 처리)
+// GET /api/admin/stats - Get dashboard statistics (캐싱 적용: 60초)
 router.get('/stats', verifyAdmin, async (req, res, next) => {
   try {
+    const cached = getCached(CACHE_KEYS.STATISTICS);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 3개 쿼리로 모든 데이터 가져오기 (병렬 실행)
     const [reservations, siteVisits, settlements] = await Promise.all([
-      supabase.from('reservations').select('status, submitted_at'),
+      supabase.from('reservations').select('status, submitted_at, venue_type'),
       supabase.from('site_visits').select('status, submitted_at'),
       supabase.from('settlements').select('refund_status, submitted_at'),
     ]);
@@ -390,14 +403,21 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
     const siteVisitsData = siteVisits.data || [];
     const settlementsData = settlements.data || [];
 
-    res.json({
+    const getVenueStats = (data, venueType) => {
+      const filtered = data.filter(r => r.venue_type === venueType);
+      return {
+        total: filtered.length,
+        pending: filtered.filter(r => r.status === 'pending').length,
+        recent: filtered.filter(r => r.submitted_at >= thirtyDaysAgo).length,
+      };
+    };
+
+    const response = {
       success: true,
       data: {
-        reservations: {
-          total: reservationsData.length,
-          pending: reservationsData.filter(r => r.status === 'pending').length,
-          recent: reservationsData.filter(r => r.submitted_at >= thirtyDaysAgo).length,
-        },
+        performance: getVenueStats(reservationsData, 'performance'),
+        studio: getVenueStats(reservationsData, 'studio'),
+        event: getVenueStats(reservationsData, 'event'),
         siteVisits: {
           total: siteVisitsData.length,
           pending: siteVisitsData.filter(s => s.status === 'pending').length,
@@ -409,7 +429,10 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
           recent: settlementsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
         },
       },
-    });
+    };
+
+    setCached(CACHE_KEYS.STATISTICS, response, CACHE_TTL.STATS);
+    res.json(response);
   } catch (err) {
     next(err);
   }

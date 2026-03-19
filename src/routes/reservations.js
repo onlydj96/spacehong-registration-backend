@@ -8,9 +8,14 @@ const router = Router();
 // Error messages (Korean)
 const ERROR_MESSAGES = {
   DB_INSERT_FAILED: '예약 등록에 실패했습니다. 잠시 후 다시 시도해주세요.',
-  INVALID_TIME_RANGE: '종료 시간은 시작 시간보다 늦어야 합니다.',
 };
 
+/**
+ * POST /api/reservations
+ * 예약 생성
+ * - validateReservation middleware에서 모든 입력 검증 완료 후 실행됨
+ * - 시간 범위, 필수 필드 등 모든 검증은 middleware에서 처리
+ */
 router.post('/', validateReservation, async (req, res, next) => {
   try {
     const {
@@ -19,6 +24,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       signatureData, termsAgreed
     } = req.body;
 
+    // 시간 계산 (검증은 이미 middleware에서 완료됨)
     const rentalHours = (parseMinutes(endTime) - parseMinutes(startTime)) / 60;
     const additionalPrice = calculatePrice(options || {});
 
@@ -49,14 +55,6 @@ router.post('/', validateReservation, async (req, res, next) => {
       terms_agreed: termsAgreed || false,
       terms_agreed_at: termsAgreed ? new Date().toISOString() : null,
     };
-
-    // Validate time range
-    if (parseMinutes(endTime) <= parseMinutes(startTime)) {
-      return res.status(400).json({
-        success: false,
-        errors: [ERROR_MESSAGES.INVALID_TIME_RANGE],
-      });
-    }
 
     const { data, error } = await supabase
       .from('reservations')

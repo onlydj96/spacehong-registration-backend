@@ -17,13 +17,28 @@ const PAGINATION = {
   MIN_LIMIT: 1,
 };
 
-// Admin email whitelist (add your admin emails here)
-const ADMIN_EMAILS = [
-  'admin@spacehong.com',
-  'spacehong@spacehong.com',
-  'spacehong2020@gmail.com',
-  // Add more admin emails as needed
-];
+// Admin email whitelist from environment variable
+// Format: ADMIN_EMAILS=email1@example.com,email2@example.com
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0);
+
+/**
+ * Sanitize search term to prevent SQL injection and special character abuse
+ * Removes characters that could affect ILIKE queries: %, _, \
+ * Also escapes other potentially dangerous characters
+ * @param {string} term - Raw search term
+ * @returns {string} - Sanitized search term
+ */
+const sanitizeSearchTerm = (term) => {
+  if (!term || typeof term !== 'string') return '';
+  return term
+    .trim()
+    .replace(/[%_\\'";\-\-]/g, '') // Remove SQL special chars
+    .replace(/[<>]/g, '') // Remove potential XSS chars
+    .slice(0, 100); // Limit length to prevent abuse
+};
 
 // Middleware to verify admin token and role
 const verifyAdmin = async (req, res, next) => {
@@ -92,7 +107,10 @@ router.get('/reservations', verifyAdmin, async (req, res, next) => {
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,organization.ilike.%${search}%,phone.ilike.%${search}%`);
+      const sanitized = sanitizeSearchTerm(search);
+      if (sanitized) {
+        query = query.or(`name.ilike.%${sanitized}%,organization.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
+      }
     }
     if (startDate) {
       query = query.gte('rental_date', startDate);
@@ -125,7 +143,7 @@ router.get('/reservations', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/reservations/:id - Get single reservation (auto-confirm on view)
+// GET /api/admin/reservations/:id - Get single reservation (읽기 전용)
 router.get('/reservations/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -142,21 +160,8 @@ router.get('/reservations/:id', verifyAdmin, async (req, res, next) => {
       return res.status(404).json({ success: false, errors: ['예약을 찾을 수 없습니다.'] });
     }
 
-    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 확정 처리
-    if (data.status === 'pending') {
-      const { data: updatedData, error: updateError } = await supabase
-        .from('reservations')
-        .update({ status: 'confirmed' })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (!updateError && updatedData) {
-        deleteCached(CACHE_KEYS.STATISTICS);
-        return res.json({ success: true, data: updatedData });
-      }
-    }
-
+    // REST 원칙 준수: GET 요청은 데이터를 변경하지 않음
+    // 상태 변경은 PATCH /api/admin/reservations/:id 사용
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -202,7 +207,10 @@ router.get('/site-visits', verifyAdmin, async (req, res, next) => {
       .order('submitted_at', { ascending: false });
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,organization.ilike.%${search}%,phone.ilike.%${search}%`);
+      const sanitized = sanitizeSearchTerm(search);
+      if (sanitized) {
+        query = query.or(`name.ilike.%${sanitized}%,organization.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
+      }
     }
     if (startDate) {
       query = query.gte('rental_date', startDate);
@@ -235,7 +243,7 @@ router.get('/site-visits', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/site-visits/:id - Get single site visit (auto-confirm on view)
+// GET /api/admin/site-visits/:id - Get single site visit (읽기 전용)
 router.get('/site-visits/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -252,21 +260,8 @@ router.get('/site-visits/:id', verifyAdmin, async (req, res, next) => {
       return res.status(404).json({ success: false, errors: ['답사 예약을 찾을 수 없습니다.'] });
     }
 
-    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 확정 처리
-    if (data.status === 'pending') {
-      const { data: updatedData, error: updateError } = await supabase
-        .from('site_visits')
-        .update({ status: 'confirmed' })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (!updateError && updatedData) {
-        deleteCached(CACHE_KEYS.STATISTICS);
-        return res.json({ success: true, data: updatedData });
-      }
-    }
-
+    // REST 원칙 준수: GET 요청은 데이터를 변경하지 않음
+    // 상태 변경은 PATCH /api/admin/site-visits/:id 사용
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -312,7 +307,10 @@ router.get('/settlements', verifyAdmin, async (req, res, next) => {
       .order('submitted_at', { ascending: false });
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,bank_info.ilike.%${search}%`);
+      const sanitized = sanitizeSearchTerm(search);
+      if (sanitized) {
+        query = query.or(`name.ilike.%${sanitized}%,bank_info.ilike.%${sanitized}%`);
+      }
     }
     if (startDate) {
       query = query.gte('rental_date', startDate);
@@ -345,7 +343,7 @@ router.get('/settlements', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/settlements/:id - Get single settlement (auto-confirm on view)
+// GET /api/admin/settlements/:id - Get single settlement (읽기 전용)
 router.get('/settlements/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -362,21 +360,8 @@ router.get('/settlements/:id', verifyAdmin, async (req, res, next) => {
       return res.status(404).json({ success: false, errors: ['정산 요청을 찾을 수 없습니다.'] });
     }
 
-    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 처리중 상태로 변경
-    if (data.refund_status === 'pending') {
-      const { data: updatedData, error: updateError } = await supabase
-        .from('settlements')
-        .update({ refund_status: 'processing' })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (!updateError && updatedData) {
-        deleteCached(CACHE_KEYS.STATISTICS);
-        return res.json({ success: true, data: updatedData });
-      }
-    }
-
+    // REST 원칙 준수: GET 요청은 데이터를 변경하지 않음
+    // 상태 변경은 PATCH /api/admin/settlements/:id 사용
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -424,8 +409,15 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
       });
     }
 
-    // Sanitize search term - remove special characters that could affect query
-    const searchTerm = query.trim().replace(/[%_\\]/g, '');
+    // Sanitize search term using common sanitizer
+    const searchTerm = sanitizeSearchTerm(query);
+
+    if (!searchTerm || searchTerm.length < 2) {
+      return res.json({
+        success: true,
+        data: { reservations: [], siteVisits: [], settlements: [] },
+      });
+    }
 
     // Search across all three tables in parallel
     const [reservationsResult, siteVisitsResult, settlementsResult] = await Promise.all([
@@ -653,11 +645,21 @@ router.get('/statistics', verifyAdmin, async (req, res, next) => {
 
     const startDateStr = startDate.toISOString().split('T')[0];
 
-    // Get all data for the period
-    const [reservations, siteVisits, settlements] = await Promise.all([
+    // 전월 대비 변화율 계산을 위한 날짜 범위
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    const previousMonthStartStr = previousMonthStart.toISOString().split('T')[0];
+    const previousMonthEndStr = previousMonthEnd.toISOString();
+
+    // Get all data for the period + previous period for change calculation
+    const [reservations, siteVisits, settlements, prevReservations, prevSiteVisits, prevSettlements] = await Promise.all([
       supabase.from('reservations').select('id, status, venue_type, submitted_at').gte('submitted_at', startDateStr),
       supabase.from('site_visits').select('id, status, submitted_at').gte('submitted_at', startDateStr),
       supabase.from('settlements').select('id, refund_status, submitted_at').gte('submitted_at', startDateStr),
+      // 전월 데이터
+      supabase.from('reservations').select('id, status').gte('submitted_at', previousMonthStartStr).lte('submitted_at', previousMonthEndStr),
+      supabase.from('site_visits').select('id, status').gte('submitted_at', previousMonthStartStr).lte('submitted_at', previousMonthEndStr),
+      supabase.from('settlements').select('id, refund_status').gte('submitted_at', previousMonthStartStr).lte('submitted_at', previousMonthEndStr),
     ]);
 
     // Calculate reservations by period
@@ -720,6 +722,38 @@ router.get('/statistics', verifyAdmin, async (req, res, next) => {
     const confirmedFromVisits = (siteVisits.data || []).filter(s => s.status === 'confirmed').length;
     const conversionRate = totalSiteVisits > 0 ? Math.round((confirmedFromVisits / totalSiteVisits) * 100) : 0;
 
+    // 전월 데이터로 변화율 계산
+    const prevReservationsCount = prevReservations.data?.length || 0;
+    const prevSiteVisitsCount = prevSiteVisits.data?.length || 0;
+    const prevSettlementsCount = prevSettlements.data?.length || 0;
+    const prevConfirmedFromVisits = (prevSiteVisits.data || []).filter(s => s.status === 'confirmed').length;
+    const prevConversionRate = prevSiteVisitsCount > 0 ? Math.round((prevConfirmedFromVisits / prevSiteVisitsCount) * 100) : 0;
+
+    // 이번 달 데이터 (전체 기간 데이터에서 이번 달만 필터링)
+    const currentMonthReservations = (reservations.data || []).filter(r => {
+      const d = new Date(r.submitted_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    const currentMonthSiteVisits = (siteVisits.data || []).filter(s => {
+      const d = new Date(s.submitted_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    const currentMonthSettlements = (settlements.data || []).filter(s => {
+      const d = new Date(s.submitted_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+
+    // 변화율 계산 함수
+    const calculateChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    const reservationsChange = calculateChange(currentMonthReservations, prevReservationsCount);
+    const siteVisitsChange = calculateChange(currentMonthSiteVisits, prevSiteVisitsCount);
+    const settlementsChange = calculateChange(currentMonthSettlements, prevSettlementsCount);
+    const conversionChange = conversionRate - prevConversionRate;
+
     res.json({
       success: true,
       data: {
@@ -728,10 +762,10 @@ router.get('/statistics', verifyAdmin, async (req, res, next) => {
           totalSiteVisits,
           totalSettlements,
           conversionRate,
-          reservationsChange: 12,
-          siteVisitsChange: 8,
-          settlementsChange: 5,
-          conversionChange: 3,
+          reservationsChange,
+          siteVisitsChange,
+          settlementsChange,
+          conversionChange,
         },
         reservationsByPeriod,
         venueTypeDistribution,

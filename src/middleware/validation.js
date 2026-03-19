@@ -62,9 +62,15 @@ export function validateReservation(req, res, next) {
   if (startTime && endTime && TIME_REGEX.test(startTime) && TIME_REGEX.test(endTime)) {
     const startMin = parseMinutes(startTime);
     const endMin = parseMinutes(endTime);
-    const hours = (endMin - startMin) / 60;
-    if (hours < 5) {
-      errors.push('대관시간은 최소 5시간 이상이어야 합니다.');
+
+    // 종료 시간이 시작 시간보다 늦어야 함
+    if (endMin <= startMin) {
+      errors.push('종료 시간은 시작 시간보다 늦어야 합니다.');
+    } else {
+      const hours = (endMin - startMin) / 60;
+      if (hours < 5) {
+        errors.push('대관시간은 최소 5시간 이상이어야 합니다.');
+      }
     }
   }
 

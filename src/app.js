@@ -7,11 +7,14 @@ import healthRouter from './routes/health.js';
 import reservationsRouter from './routes/reservations.js';
 import siteVisitsRouter from './routes/siteVisits.js';
 import settlementsRouter from './routes/settlements.js';
-import adminRouter from './routes/admin.js';
+import adminRouter from './routes/admin/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/logger.js';
 
 const app = express();
+
+// Trust proxy (needed for rate limiting behind reverse proxy like Vercel)
+app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(compression());
@@ -23,10 +26,24 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
 
 app.use(cors({
   origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
+  credentials: true,
 }));
 
 app.use(express.json({ limit: '5mb' }));
+
+/**
+ * Rate limit key generator
+ * Uses combination of IP + User-Agent for better identification
+ * Helps distinguish users behind same NAT
+ */
+const generateRateLimitKey = (req) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  // Hash user-agent to reduce key size while maintaining uniqueness
+  const uaHash = userAgent.slice(0, 50);
+  return `${ip}-${uaHash}`;
+};
 
 // Rate limiter for public form submissions (strict)
 const submissionLimiter = rateLimit({
@@ -35,6 +52,9 @@ const submissionLimiter = rateLimit({
   message: { success: false, errors: ['너무 많은 요청입니다. 잠시 후 다시 시도해주세요.'] },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: generateRateLimitKey,
+  // Skip rate limiting in development
+  skip: () => process.env.NODE_ENV === 'development',
 });
 
 // Rate limiter for admin API (more permissive but still protected)
@@ -44,6 +64,7 @@ const adminLimiter = rateLimit({
   message: { success: false, errors: ['요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'] },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: generateRateLimitKey,
 });
 
 // Rate limiter for search endpoint (prevent abuse)
@@ -53,6 +74,7 @@ const searchLimiter = rateLimit({
   message: { success: false, errors: ['검색 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'] },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: generateRateLimitKey,
 });
 
 app.use('/api/health', healthRouter);

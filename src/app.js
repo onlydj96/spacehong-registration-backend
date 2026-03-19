@@ -28,10 +28,29 @@ app.use(cors({
 
 app.use(express.json({ limit: '5mb' }));
 
+// Rate limiter for public form submissions (strict)
 const submissionLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per window
   message: { success: false, errors: ['너무 많은 요청입니다. 잠시 후 다시 시도해주세요.'] },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for admin API (more permissive but still protected)
+const adminLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+  message: { success: false, errors: ['요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'] },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for search endpoint (prevent abuse)
+const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 searches per minute
+  message: { success: false, errors: ['검색 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'] },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -40,7 +59,8 @@ app.use('/api/health', healthRouter);
 app.use('/api/reservations', submissionLimiter, reservationsRouter);
 app.use('/api/site-visits', submissionLimiter, siteVisitsRouter);
 app.use('/api/settlements', submissionLimiter, settlementsRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/admin/search', searchLimiter); // Apply search limiter before admin router
+app.use('/api/admin', adminLimiter, adminRouter);
 
 app.use((req, res) => {
   res.status(404).json({

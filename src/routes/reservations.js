@@ -5,6 +5,12 @@ import { parseMinutes, calculatePrice } from '../utils/helpers.js';
 
 const router = Router();
 
+// Error messages (Korean)
+const ERROR_MESSAGES = {
+  DB_INSERT_FAILED: '예약 등록에 실패했습니다. 잠시 후 다시 시도해주세요.',
+  INVALID_TIME_RANGE: '종료 시간은 시작 시간보다 늦어야 합니다.',
+};
+
 router.post('/', validateReservation, async (req, res, next) => {
   try {
     const {
@@ -44,13 +50,27 @@ router.post('/', validateReservation, async (req, res, next) => {
       terms_agreed_at: termsAgreed ? new Date().toISOString() : null,
     };
 
+    // Validate time range
+    if (parseMinutes(endTime) <= parseMinutes(startTime)) {
+      return res.status(400).json({
+        success: false,
+        errors: [ERROR_MESSAGES.INVALID_TIME_RANGE],
+      });
+    }
+
     const { data, error } = await supabase
       .from('reservations')
       .insert(insertData)
       .select('id, total_price, submitted_at')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[Reservation Error]', error.code, error.message);
+      return res.status(500).json({
+        success: false,
+        errors: [ERROR_MESSAGES.DB_INSERT_FAILED],
+      });
+    }
 
     res.status(201).json({
       success: true,

@@ -10,7 +10,21 @@ const CACHE_TTL = {
   LIST: 30,
 };
 
-// Middleware to verify admin token
+// Pagination limits
+const PAGINATION = {
+  DEFAULT_LIMIT: 20,
+  MAX_LIMIT: 100,
+  MIN_LIMIT: 1,
+};
+
+// Admin email whitelist (add your admin emails here)
+const ADMIN_EMAILS = [
+  'admin@spacehong.com',
+  'spacehong2020@gmail.com',
+  // Add more admin emails as needed
+];
+
+// Middleware to verify admin token and role
 const verifyAdmin = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -26,7 +40,14 @@ const verifyAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, errors: ['유효하지 않은 토큰입니다.'] });
     }
 
-    // Check if user has admin role (you can customize this based on your needs)
+    // Check if user has admin role via email whitelist or user metadata
+    const isAdminByEmail = ADMIN_EMAILS.includes(user.email);
+    const isAdminByRole = user.user_metadata?.role === 'admin' || user.app_metadata?.role === 'admin';
+
+    if (!isAdminByEmail && !isAdminByRole) {
+      return res.status(403).json({ success: false, errors: ['관리자 권한이 없습니다.'] });
+    }
+
     req.user = user;
     next();
   } catch (err) {
@@ -34,11 +55,20 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
+// Helper to sanitize and validate pagination params
+const getPaginationParams = (query) => {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  let limit = parseInt(query.limit, 10) || PAGINATION.DEFAULT_LIMIT;
+  limit = Math.min(Math.max(limit, PAGINATION.MIN_LIMIT), PAGINATION.MAX_LIMIT);
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+};
+
 // GET /api/admin/reservations - Get all reservations with search
 router.get('/reservations', verifyAdmin, async (req, res, next) => {
   try {
-    const { search, startDate, endDate, status, tab = 'upcoming', page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { search, startDate, endDate, status, tab = 'upcoming' } = req.query;
+    const { page, limit, offset } = getPaginationParams(req.query);
     const today = new Date().toISOString().split('T')[0];
 
     let query = supabase
@@ -94,7 +124,7 @@ router.get('/reservations', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/reservations/:id - Get single reservation
+// GET /api/admin/reservations/:id - Get single reservation (auto-confirm on view)
 router.get('/reservations/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -109,6 +139,21 @@ router.get('/reservations/:id', verifyAdmin, async (req, res, next) => {
 
     if (!data) {
       return res.status(404).json({ success: false, errors: ['예약을 찾을 수 없습니다.'] });
+    }
+
+    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 확정 처리
+    if (data.status === 'pending') {
+      const { data: updatedData, error: updateError } = await supabase
+        .from('reservations')
+        .update({ status: 'confirmed' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!updateError && updatedData) {
+        deleteCached(CACHE_KEYS.STATISTICS);
+        return res.json({ success: true, data: updatedData });
+      }
     }
 
     res.json({ success: true, data });
@@ -147,8 +192,8 @@ router.patch('/reservations/:id', verifyAdmin, async (req, res, next) => {
 // GET /api/admin/site-visits - Get all site visits with search
 router.get('/site-visits', verifyAdmin, async (req, res, next) => {
   try {
-    const { search, startDate, endDate, status, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { search, startDate, endDate, status } = req.query;
+    const { page, limit, offset } = getPaginationParams(req.query);
 
     let query = supabase
       .from('site_visits')
@@ -189,7 +234,7 @@ router.get('/site-visits', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/site-visits/:id - Get single site visit
+// GET /api/admin/site-visits/:id - Get single site visit (auto-confirm on view)
 router.get('/site-visits/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -204,6 +249,21 @@ router.get('/site-visits/:id', verifyAdmin, async (req, res, next) => {
 
     if (!data) {
       return res.status(404).json({ success: false, errors: ['답사 예약을 찾을 수 없습니다.'] });
+    }
+
+    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 확정 처리
+    if (data.status === 'pending') {
+      const { data: updatedData, error: updateError } = await supabase
+        .from('site_visits')
+        .update({ status: 'confirmed' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!updateError && updatedData) {
+        deleteCached(CACHE_KEYS.STATISTICS);
+        return res.json({ success: true, data: updatedData });
+      }
     }
 
     res.json({ success: true, data });
@@ -242,8 +302,8 @@ router.patch('/site-visits/:id', verifyAdmin, async (req, res, next) => {
 // GET /api/admin/settlements - Get all settlements with search
 router.get('/settlements', verifyAdmin, async (req, res, next) => {
   try {
-    const { search, startDate, endDate, refundStatus, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { search, startDate, endDate, refundStatus } = req.query;
+    const { page, limit, offset } = getPaginationParams(req.query);
 
     let query = supabase
       .from('settlements')
@@ -284,7 +344,7 @@ router.get('/settlements', verifyAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/settlements/:id - Get single settlement
+// GET /api/admin/settlements/:id - Get single settlement (auto-confirm on view)
 router.get('/settlements/:id', verifyAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -299,6 +359,21 @@ router.get('/settlements/:id', verifyAdmin, async (req, res, next) => {
 
     if (!data) {
       return res.status(404).json({ success: false, errors: ['정산 요청을 찾을 수 없습니다.'] });
+    }
+
+    // Auto-confirm: 대기 상태인 경우 조회 시 자동으로 처리중 상태로 변경
+    if (data.refund_status === 'pending') {
+      const { data: updatedData, error: updateError } = await supabase
+        .from('settlements')
+        .update({ refund_status: 'processing' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!updateError && updatedData) {
+        deleteCached(CACHE_KEYS.STATISTICS);
+        return res.json({ success: true, data: updatedData });
+      }
     }
 
     res.json({ success: true, data });
@@ -337,7 +412,9 @@ router.patch('/settlements/:id', verifyAdmin, async (req, res, next) => {
 // GET /api/admin/search - Global search across all data
 router.get('/search', verifyAdmin, async (req, res, next) => {
   try {
-    const { query, limit = 10 } = req.query;
+    const { query } = req.query;
+    // Limit search results (max 50 per table)
+    const searchLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
 
     if (!query || query.trim().length < 2) {
       return res.json({
@@ -346,7 +423,8 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
       });
     }
 
-    const searchTerm = query.trim();
+    // Sanitize search term - remove special characters that could affect query
+    const searchTerm = query.trim().replace(/[%_\\]/g, '');
 
     // Search across all three tables in parallel
     const [reservationsResult, siteVisitsResult, settlementsResult] = await Promise.all([
@@ -355,19 +433,19 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
         .select('id, name, organization, phone, rental_date, venue_type, status, submitted_at')
         .or(`name.ilike.%${searchTerm}%,organization.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
         .order('submitted_at', { ascending: false })
-        .limit(limit),
+        .limit(searchLimit),
       supabase
         .from('site_visits')
         .select('id, name, organization, phone, rental_date, has_rental, status, submitted_at')
         .or(`name.ilike.%${searchTerm}%,organization.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
         .order('submitted_at', { ascending: false })
-        .limit(limit),
+        .limit(searchLimit),
       supabase
         .from('settlements')
         .select('id, name, rental_date, bank_info, account_number, refund_status, submitted_at')
         .or(`name.ilike.%${searchTerm}%,bank_info.ilike.%${searchTerm}%`)
         .order('submitted_at', { ascending: false })
-        .limit(limit),
+        .limit(searchLimit),
     ]);
 
     res.json({

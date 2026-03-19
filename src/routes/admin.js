@@ -20,6 +20,7 @@ const PAGINATION = {
 // Admin email whitelist (add your admin emails here)
 const ADMIN_EMAILS = [
   'admin@spacehong.com',
+  'spacehong@spacehong.com',
   'spacehong2020@gmail.com',
   // Add more admin emails as needed
 ];

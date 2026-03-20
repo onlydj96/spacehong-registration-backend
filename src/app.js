@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import healthRouter from './routes/health.js';
 import reservationsRouter from './routes/reservations.js';
 import siteVisitsRouter from './routes/siteVisits.js';
@@ -36,9 +36,10 @@ app.use(express.json({ limit: '5mb' }));
  * Rate limit key generator
  * Uses combination of IP + User-Agent for better identification
  * Helps distinguish users behind same NAT
+ * Uses ipKeyGenerator helper for proper IPv6 handling
  */
-const generateRateLimitKey = (req) => {
-  const ip = req.ip || req.connection.remoteAddress;
+const generateRateLimitKey = (req, res) => {
+  const ip = ipKeyGenerator(req, res);
   const userAgent = req.headers['user-agent'] || 'unknown';
   // Hash user-agent to reduce key size while maintaining uniqueness
   const uaHash = userAgent.slice(0, 50);

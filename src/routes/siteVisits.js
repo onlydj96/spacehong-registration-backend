@@ -12,7 +12,7 @@ const VALIDATION = {
   PHONE_REGEX: VALIDATION_PATTERNS.PHONE,
   TIME_REGEX: VALIDATION_PATTERNS.TIME,
   DATE_REGEX: VALIDATION_PATTERNS.DATE,
-  VALID_HAS_RENTAL: ['yes', 'no', 'considering'],
+  VALID_HAS_RENTAL: ['confirmed', 'after_visit'],
 };
 
 // POST /api/site-visits - Create new site visit request

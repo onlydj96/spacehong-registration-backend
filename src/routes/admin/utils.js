@@ -28,14 +28,27 @@ export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
 
 /**
  * Sanitize search term to prevent SQL injection and special character abuse
+ *
+ * 제거하는 문자:
+ * - % _ : SQL LIKE 와일드카드
+ * - \ ' " : 이스케이프 및 문자열 구분자
+ * - ; : SQL 구문 종료
+ * - - (연속 2개): SQL 주석
+ * - < > : XSS 방지
  */
 export const sanitizeSearchTerm = (term) => {
   if (!term || typeof term !== 'string') return '';
   return term
     .trim()
-    .replace(/[%_\\'";\-\-]/g, '') // Remove SQL special chars
-    .replace(/[<>]/g, '') // Remove potential XSS chars
-    .slice(0, 100); // Limit length to prevent abuse
+    .replace(/%/g, '')           // SQL LIKE wildcard
+    .replace(/_/g, '')           // SQL LIKE single char wildcard
+    .replace(/\\/g, '')          // Escape character
+    .replace(/'/g, '')           // Single quote
+    .replace(/"/g, '')           // Double quote
+    .replace(/;/g, '')           // SQL statement terminator
+    .replace(/--/g, '')          // SQL comment (두 개의 하이픈)
+    .replace(/[<>]/g, '')        // XSS prevention
+    .slice(0, 100);              // Limit length to prevent abuse
 };
 
 /**

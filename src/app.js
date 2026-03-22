@@ -34,16 +34,17 @@ app.use(express.json({ limit: '5mb' }));
 
 /**
  * Rate limit key generator
- * Uses combination of IP + User-Agent for better identification
- * Helps distinguish users behind same NAT
+ * IP 기반으로만 제한하여 User-Agent 조작을 통한 우회 방지
  * Uses ipKeyGenerator helper for proper IPv6 handling
+ *
+ * 보안 고려사항:
+ * - User-Agent는 클라이언트가 쉽게 조작 가능하므로 키에서 제외
+ * - trust proxy 설정으로 X-Forwarded-For 헤더를 신뢰 (리버스 프록시 환경)
+ * - 동일 NAT 뒤의 사용자들은 동일한 제한을 받음 (보안과 편의 트레이드오프)
  */
 const generateRateLimitKey = (req, res) => {
-  const ip = ipKeyGenerator(req, res);
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  // Hash user-agent to reduce key size while maintaining uniqueness
-  const uaHash = userAgent.slice(0, 50);
-  return `${ip}-${uaHash}`;
+  // IP만 사용하여 User-Agent 조작을 통한 rate limit 우회 방지
+  return ipKeyGenerator(req, res);
 };
 
 // Rate limiter for public form submissions (strict)

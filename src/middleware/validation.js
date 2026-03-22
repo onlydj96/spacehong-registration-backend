@@ -2,13 +2,20 @@ import { parseMinutes } from '../utils/helpers.js';
 
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const ALLOWED_REFERRALS = ['스페이스클라우드', '아워플레이스', '네이버', '인스타', '기타'];
-const ALLOWED_VENUE_TYPES = ['performance', 'event', 'studio'];
 
-const MAX_PERFORMERS = 200;
-const MAX_OPERATOR_HOURS = 12;
-const MAX_NAME_LENGTH = 50;
-const MAX_DESCRIPTION_LENGTH = 500;
+// 환경변수에서 설정값 로드 (기본값 제공)
+const ALLOWED_REFERRALS = (process.env.ALLOWED_REFERRALS || '스페이스클라우드,아워플레이스,네이버,인스타,기타')
+  .split(',')
+  .map(s => s.trim());
+const ALLOWED_VENUE_TYPES = (process.env.ALLOWED_VENUE_TYPES || 'performance,event,studio')
+  .split(',')
+  .map(s => s.trim());
+
+const MAX_PERFORMERS = parseInt(process.env.MAX_PERFORMERS, 10) || 200;
+const MAX_OPERATOR_HOURS = parseInt(process.env.MAX_OPERATOR_HOURS, 10) || 12;
+const MAX_NAME_LENGTH = parseInt(process.env.MAX_NAME_LENGTH, 10) || 50;
+const MAX_DESCRIPTION_LENGTH = parseInt(process.env.MAX_DESCRIPTION_LENGTH, 10) || 500;
+const MAX_SIGNATURE_SIZE = parseInt(process.env.MAX_SIGNATURE_SIZE, 10) || 500000; // 500KB
 
 export function validateReservation(req, res, next) {
   const errors = [];
@@ -105,6 +112,24 @@ export function validateReservation(req, res, next) {
       } else if (options.extraOperatorHours > MAX_OPERATOR_HOURS) {
         errors.push(`추가 오퍼레이터 시간은 ${MAX_OPERATOR_HOURS}시간 이하여야 합니다.`);
       }
+    }
+  }
+
+  // termsAgreed 필수 검증
+  const { termsAgreed } = req.body;
+  if (termsAgreed !== true) {
+    errors.push('이용약관에 동의해주세요.');
+  }
+
+  // signatureData 형식 검증 (Base64 Data URL 형식)
+  const { signatureData } = req.body;
+  if (signatureData) {
+    if (typeof signatureData !== 'string') {
+      errors.push('서명 데이터 형식이 올바르지 않습니다.');
+    } else if (!signatureData.startsWith('data:image/')) {
+      errors.push('서명 데이터는 이미지 형식이어야 합니다.');
+    } else if (signatureData.length > MAX_SIGNATURE_SIZE) {
+      errors.push('서명 데이터가 너무 큽니다.');
     }
   }
 

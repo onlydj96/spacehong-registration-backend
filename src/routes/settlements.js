@@ -13,8 +13,10 @@ const VALIDATION = {
   ACCOUNT_NUMBER_MAX_LENGTH: 20,
   FEEDBACK_MAX_LENGTH: 2000,
   INSTAGRAM_REQUEST_MAX_LENGTH: 500,
+  MAX_MEDIA_FILES: 20,
   DATE_REGEX: VALIDATION_PATTERNS.DATE,
   ACCOUNT_NUMBER_REGEX: /^\d{10,20}$/, // Korean bank account: 10-20 digits
+  MEDIA_URL_REGEX: /^https:\/\/.+\.(jpg|jpeg|png|gif|webp|mp4|mov|webm)(\?.*)?$/i,
   VALID_BANKS: [
     '국민은행', 'KB국민은행', '신한은행', '우리은행', '하나은행', 'KEB하나은행',
     '농협은행', 'NH농협은행', '기업은행', 'IBK기업은행', 'SC제일은행',
@@ -29,7 +31,7 @@ router.post('/', async (req, res, next) => {
     const {
       name, rentalDate, bankName, accountHolder, accountNumber,
       rating, goodPoints, improvements,
-      mediaFiles, instagramConsent, instagramRequest
+      mediaUrls, instagramConsent, instagramRequest
     } = req.body;
 
     // Validation
@@ -90,6 +92,18 @@ router.post('/', async (req, res, next) => {
       errors.push(`인스타그램 요청사항은 ${VALIDATION.INSTAGRAM_REQUEST_MAX_LENGTH}자 이내로 입력해주세요.`);
     }
 
+    // Media URLs validation (optional)
+    let validatedMediaUrls = [];
+    if (mediaUrls && Array.isArray(mediaUrls)) {
+      if (mediaUrls.length > VALIDATION.MAX_MEDIA_FILES) {
+        errors.push(`미디어 파일은 최대 ${VALIDATION.MAX_MEDIA_FILES}개까지 첨부할 수 있습니다.`);
+      } else {
+        validatedMediaUrls = mediaUrls.filter(url =>
+          typeof url === 'string' && VALIDATION.MEDIA_URL_REGEX.test(url)
+        );
+      }
+    }
+
     if (errors.length > 0) {
       return res.status(400).json({ success: false, errors });
     }
@@ -103,7 +117,7 @@ router.post('/', async (req, res, next) => {
       rating,
       good_points: goodPoints?.trim() || null,
       improvements: improvements?.trim() || null,
-      media_urls: [], // Media files will be handled separately via storage
+      media_urls: validatedMediaUrls,
       instagram_consent: instagramConsent || false,
       instagram_request: instagramRequest?.trim() || null,
     };

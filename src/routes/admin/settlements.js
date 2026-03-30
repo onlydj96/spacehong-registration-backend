@@ -74,6 +74,17 @@ router.get('/:id', verifyAdmin, async (req, res, next) => {
       return res.status(404).json({ success: false, errors: ['정산 요청을 찾을 수 없습니다.'] });
     }
 
+    // 미확인 상태일 경우 viewed_at 업데이트 (확인 처리)
+    if (!data.viewed_at) {
+      await supabase
+        .from('settlements')
+        .update({ viewed_at: new Date().toISOString() })
+        .eq('id', id);
+
+      // 통계 캐시 무효화
+      deleteCached(CACHE_KEYS.STATISTICS);
+    }
+
     res.json({ success: true, data });
   } catch (err) {
     next(err);

@@ -19,10 +19,20 @@ export const PAGINATION = {
 };
 
 // Admin email whitelist from environment variable
+// SECURITY: If no ADMIN_EMAILS configured, only role-based auth is allowed
 export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
+
+// Security warning if no email whitelist is configured
+if (ADMIN_EMAILS.length === 0 && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '[SECURITY WARNING] ADMIN_EMAILS environment variable is not set. ' +
+    'Admin access will only be allowed via user metadata role. ' +
+    'Set ADMIN_EMAILS for additional security layer.'
+  );
+}
 
 // ===== Utility Functions =====
 
@@ -83,10 +93,14 @@ export const verifyAdmin = async (req, res, next) => {
     }
 
     // Check if user has admin role via email whitelist or user metadata
-    const isAdminByEmail = ADMIN_EMAILS.includes(user.email);
+    const userEmail = user.email?.toLowerCase();
+    const isAdminByEmail = userEmail && ADMIN_EMAILS.includes(userEmail);
     const isAdminByRole = user.user_metadata?.role === 'admin' || user.app_metadata?.role === 'admin';
 
+    // SECURITY: Require at least one authentication method
     if (!isAdminByEmail && !isAdminByRole) {
+      // Log failed admin access attempt for security monitoring
+      console.warn(`[SECURITY] Admin access denied for user: ${userEmail || 'unknown'}`);
       return res.status(403).json({ success: false, errors: ['관리자 권한이 없습니다.'] });
     }
 

@@ -15,7 +15,31 @@ const MAX_PERFORMERS = parseInt(process.env.MAX_PERFORMERS, 10) || 200;
 const MAX_OPERATOR_HOURS = parseInt(process.env.MAX_OPERATOR_HOURS, 10) || 12;
 const MAX_NAME_LENGTH = parseInt(process.env.MAX_NAME_LENGTH, 10) || 50;
 const MAX_DESCRIPTION_LENGTH = parseInt(process.env.MAX_DESCRIPTION_LENGTH, 10) || 500;
-const MAX_SIGNATURE_SIZE = parseInt(process.env.MAX_SIGNATURE_SIZE, 10) || 500000; // 500KB
+const MAX_SIGNATURE_SIZE = parseInt(process.env.MAX_SIGNATURE_SIZE, 10) || 500000; // 500KB (실제 바이트 기준)
+
+/**
+ * Base64 Data URL에서 실제 바이트 크기 계산
+ * Base64는 원본보다 약 33% 더 크므로 정확한 크기 계산 필요
+ * @param {string} dataUrl - data:image/png;base64,... 형식의 문자열
+ * @returns {number} - 실제 바이트 크기
+ */
+function getBase64ByteSize(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return 0;
+
+  // data:image/png;base64, 부분 제거
+  const base64Index = dataUrl.indexOf('base64,');
+  if (base64Index === -1) return dataUrl.length;
+
+  const base64String = dataUrl.substring(base64Index + 7);
+
+  // Base64 패딩(=) 개수 확인
+  let padding = 0;
+  if (base64String.endsWith('==')) padding = 2;
+  else if (base64String.endsWith('=')) padding = 1;
+
+  // 실제 바이트 크기 계산: (base64길이 * 3 / 4) - 패딩
+  return Math.floor((base64String.length * 3) / 4) - padding;
+}
 
 export function validateReservation(req, res, next) {
   const errors = [];
@@ -128,8 +152,12 @@ export function validateReservation(req, res, next) {
       errors.push('서명 데이터 형식이 올바르지 않습니다.');
     } else if (!signatureData.startsWith('data:image/')) {
       errors.push('서명 데이터는 이미지 형식이어야 합니다.');
-    } else if (signatureData.length > MAX_SIGNATURE_SIZE) {
-      errors.push('서명 데이터가 너무 큽니다.');
+    } else {
+      // Base64 인코딩된 데이터의 실제 바이트 크기 계산
+      const actualByteSize = getBase64ByteSize(signatureData);
+      if (actualByteSize > MAX_SIGNATURE_SIZE) {
+        errors.push(`서명 데이터가 너무 큽니다. (최대 ${Math.round(MAX_SIGNATURE_SIZE / 1024)}KB)`);
+      }
     }
   }
 

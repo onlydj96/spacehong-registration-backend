@@ -99,9 +99,9 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const [reservations, siteVisits, settlements] = await Promise.all([
-      supabase.from('reservations').select('status, submitted_at, venue_type'),
-      supabase.from('site_visits').select('status, submitted_at'),
-      supabase.from('settlements').select('refund_status, submitted_at'),
+      supabase.from('reservations').select('status, submitted_at, venue_type, viewed_at'),
+      supabase.from('site_visits').select('status, submitted_at, viewed_at'),
+      supabase.from('settlements').select('refund_status, submitted_at, viewed_at'),
     ]);
 
     const reservationsData = reservations.data || [];
@@ -114,6 +114,7 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
         total: filtered.length,
         pending: filtered.filter(r => r.status === 'pending').length,
         recent: filtered.filter(r => r.submitted_at >= thirtyDaysAgo).length,
+        unviewed: filtered.filter(r => r.viewed_at === null).length,
       };
     };
 
@@ -127,11 +128,13 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
           total: siteVisitsData.length,
           pending: siteVisitsData.filter(s => s.status === 'pending').length,
           recent: siteVisitsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
+          unviewed: siteVisitsData.filter(s => s.viewed_at === null).length,
         },
         settlements: {
           total: settlementsData.length,
           pending: settlementsData.filter(s => s.refund_status === 'pending').length,
           recent: settlementsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
+          unviewed: settlementsData.filter(s => s.viewed_at === null).length,
         },
       },
     };
@@ -145,20 +148,20 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
 
 // ===== Schedule =====
 
-// GET /api/admin/schedule/monthly - Get monthly confirmed reservations
+// GET /api/admin/schedule/monthly - Get remaining rental schedule for current month (from today)
 router.get('/schedule/monthly', verifyAdmin, async (req, res, next) => {
   try {
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
     const { data, error } = await supabase
       .from('reservations')
       .select('id, name, organization, rental_date, venue_type, start_time, end_time, status')
-      .eq('status', 'confirmed')
-      .gte('rental_date', firstDay)
+      .gte('rental_date', today)
       .lte('rental_date', lastDay)
-      .order('rental_date', { ascending: true });
+      .order('rental_date', { ascending: true })
+      .order('start_time', { ascending: true });
 
     if (error) throw error;
 

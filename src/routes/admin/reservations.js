@@ -12,13 +12,18 @@ const router = Router();
 // GET /reservations - Get all reservations with search
 router.get('/', verifyAdmin, async (req, res, next) => {
   try {
-    const { search, startDate, endDate, status, tab = 'upcoming' } = req.query;
+    const { search, startDate, endDate, status, tab = 'upcoming', venueType } = req.query;
     const { page, limit, offset } = getPaginationParams(req.query);
     const today = new Date().toISOString().split('T')[0];
 
     let query = supabase
       .from('reservations')
       .select('*', { count: 'exact' });
+
+    // Venue type filtering (공연장, 스튜디오, 행사장)
+    if (venueType) {
+      query = query.eq('venue_type', venueType);
+    }
 
     // Tab filtering: upcoming (today and future) vs past
     if (tab === 'upcoming') {
@@ -84,6 +89,17 @@ router.get('/:id', verifyAdmin, async (req, res, next) => {
 
     if (!data) {
       return res.status(404).json({ success: false, errors: ['예약을 찾을 수 없습니다.'] });
+    }
+
+    // 미확인 상태일 경우 viewed_at 업데이트 (확인 처리)
+    if (!data.viewed_at) {
+      await supabase
+        .from('reservations')
+        .update({ viewed_at: new Date().toISOString() })
+        .eq('id', id);
+
+      // 통계 캐시 무효화
+      deleteCached(CACHE_KEYS.STATISTICS);
     }
 
     res.json({ success: true, data });

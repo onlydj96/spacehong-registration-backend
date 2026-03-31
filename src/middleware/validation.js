@@ -2,6 +2,40 @@ import { parseMinutes } from '../utils/helpers.js';
 
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// XSS 방지를 위한 위험 패턴
+const DANGEROUS_PATTERNS = [
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+  /javascript:/gi,
+  /on\w+\s*=/gi,
+  /<iframe/gi,
+  /<object/gi,
+  /<embed/gi,
+];
+
+/**
+ * XSS 위험 패턴 검사
+ * @param {string} value - 검사할 문자열
+ * @returns {boolean} - 위험 패턴 포함 여부
+ */
+function containsDangerousPatterns(value) {
+  if (!value || typeof value !== 'string') return false;
+  return DANGEROUS_PATTERNS.some(pattern => pattern.test(value));
+}
+
+/**
+ * 문자열 sanitization (HTML 태그 제거)
+ * @param {string} value - 정제할 문자열
+ * @returns {string} - 정제된 문자열
+ */
+function sanitizeString(value) {
+  if (!value || typeof value !== 'string') return value;
+  return value
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .trim();
+}
 
 // 환경변수에서 설정값 로드 (기본값 제공)
 const ALLOWED_REFERRALS = (process.env.ALLOWED_REFERRALS || '스페이스클라우드,아워플레이스,네이버,인스타,기타')
@@ -73,6 +107,8 @@ export function validateReservation(req, res, next) {
 
   if (!rentalDate) {
     errors.push('대관날짜는 필수입니다.');
+  } else if (!DATE_REGEX.test(rentalDate)) {
+    errors.push('대관날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)');
   } else {
     const date = new Date(rentalDate);
     date.setHours(0, 0, 0, 0);
@@ -80,6 +116,12 @@ export function validateReservation(req, res, next) {
     today.setHours(0, 0, 0, 0);
     if (isNaN(date.getTime()) || date <= today) {
       errors.push('대관날짜는 오늘 이후여야 합니다.');
+    }
+    // 너무 먼 미래 날짜 제한 (1년 이내)
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 1);
+    if (date > maxDate) {
+      errors.push('대관날짜는 1년 이내로 선택해주세요.');
     }
   }
 
@@ -111,8 +153,13 @@ export function validateReservation(req, res, next) {
     errors.push(`공연자 인원은 ${MAX_PERFORMERS}명 이하여야 합니다.`);
   }
 
-  if (description && typeof description === 'string' && description.trim().length > MAX_DESCRIPTION_LENGTH) {
-    errors.push(`대관 설명은 ${MAX_DESCRIPTION_LENGTH}자 이내로 입력해주세요.`);
+  if (description && typeof description === 'string') {
+    if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
+      errors.push(`대관 설명은 ${MAX_DESCRIPTION_LENGTH}자 이내로 입력해주세요.`);
+    }
+    if (containsDangerousPatterns(description)) {
+      errors.push('대관 설명에 허용되지 않는 내용이 포함되어 있습니다.');
+    }
   }
 
   if (referralSources && Array.isArray(referralSources)) {

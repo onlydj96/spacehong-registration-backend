@@ -22,11 +22,21 @@ export const VALIDATION_PATTERNS = {
 
 /**
  * Parse time string to minutes since midnight
- * @param {string} timeStr - Time string in HH:MM format
- * @returns {number} Minutes since midnight
+ * @param {string} timeStr - Time string in HH:MM format or "익일 HH:MM" format
+ * @returns {number} Minutes since midnight (or since midnight + 24h for next day)
  */
 export function parseMinutes(timeStr) {
-  if (!timeStr || !VALIDATION_PATTERNS.TIME.test(timeStr)) {
+  if (!timeStr) return 0;
+
+  // "익일 HH:MM" 형식 처리
+  if (timeStr.startsWith('익일 ')) {
+    const actualTime = timeStr.replace('익일 ', '');
+    if (!VALIDATION_PATTERNS.TIME.test(actualTime)) return 0;
+    const [h, m] = actualTime.split(':').map(Number);
+    return h * TIME_CONSTANTS.MINUTES_PER_HOUR + m + 24 * TIME_CONSTANTS.MINUTES_PER_HOUR;
+  }
+
+  if (!VALIDATION_PATTERNS.TIME.test(timeStr)) {
     return 0;
   }
   const [h, m] = timeStr.split(':').map(Number);

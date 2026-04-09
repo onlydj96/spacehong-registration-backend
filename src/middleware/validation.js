@@ -2,6 +2,7 @@ import { parseMinutes } from '../utils/helpers.js';
 
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const NEXT_DAY_TIME_REGEX = /^익일 ([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 // XSS 방지를 위한 위험 패턴
@@ -128,13 +129,24 @@ export function validateReservation(req, res, next) {
   if (!startTime || !TIME_REGEX.test(startTime)) {
     errors.push('시작 시간이 올바르지 않습니다.');
   }
-  if (!endTime || !TIME_REGEX.test(endTime)) {
+
+  // 종료 시간: 일반 형식 또는 "익일 HH:MM" 형식 허용
+  const isValidEndTime = endTime && (TIME_REGEX.test(endTime) || NEXT_DAY_TIME_REGEX.test(endTime));
+  if (!isValidEndTime) {
     errors.push('종료 시간이 올바르지 않습니다.');
   }
 
-  if (startTime && endTime && TIME_REGEX.test(startTime) && TIME_REGEX.test(endTime)) {
+  if (startTime && isValidEndTime && TIME_REGEX.test(startTime)) {
     const startMin = parseMinutes(startTime);
-    const endMin = parseMinutes(endTime);
+
+    // 익일 시간 처리: "익일 HH:MM" → 24시간 추가
+    let endMin;
+    if (NEXT_DAY_TIME_REGEX.test(endTime)) {
+      const actualEndTime = endTime.replace('익일 ', '');
+      endMin = parseMinutes(actualEndTime) + 24 * 60;
+    } else {
+      endMin = parseMinutes(endTime);
+    }
 
     // 종료 시간이 시작 시간보다 늦어야 함
     if (endMin <= startMin) {

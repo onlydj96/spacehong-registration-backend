@@ -26,16 +26,13 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     }
 
     // Tab filtering: upcoming (today and future) vs past
+    // Always sort by submitted_at (newest first) for chronological submission order
     if (tab === 'upcoming') {
       query = query.gte('rental_date', today);
-      query = query.order('rental_date', { ascending: true });
-      query = query.order('start_time', { ascending: true });
     } else if (tab === 'past') {
       query = query.lt('rental_date', today);
-      query = query.order('rental_date', { ascending: false });
-    } else {
-      query = query.order('submitted_at', { ascending: false });
     }
+    query = query.order('submitted_at', { ascending: false });
 
     if (search) {
       const sanitized = sanitizeSearchTerm(search);

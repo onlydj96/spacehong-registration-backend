@@ -118,4 +118,29 @@ router.patch('/:id', verifyAdmin, async (req, res, next) => {
   }
 });
 
+// PATCH /site-visits/:id/memo - Update admin memo
+router.patch('/:id/memo', verifyAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { memo } = req.body;
+
+    if (typeof memo !== 'string') {
+      return res.status(400).json({ success: false, errors: ['메모는 문자열이어야 합니다.'] });
+    }
+
+    const { data, error } = await supabase
+      .from('site_visits')
+      .update({ admin_memo: memo || null })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

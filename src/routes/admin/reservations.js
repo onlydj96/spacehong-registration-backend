@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { supabase } from '../../services/supabase.js';
 import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
 import { verifyAdmin, getPaginationParams, sanitizeSearchTerm } from './utils.js';
+import { sendReservationConfirmEmail } from '../../services/emailService.js';
 
 const router = Router();
 
@@ -126,6 +127,13 @@ router.patch('/:id', verifyAdmin, async (req, res, next) => {
     if (error) throw error;
 
     deleteCached(CACHE_KEYS.STATISTICS);
+
+    if (status === 'confirmed') {
+      sendReservationConfirmEmail(data).catch(err =>
+        console.error('[Email] 확정 이메일 발송 실패 (예약 id:', id, '):', err.message)
+      );
+    }
+
     res.json({ success: true, data });
   } catch (err) {
     next(err);

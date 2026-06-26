@@ -76,10 +76,12 @@ function getBase64ByteSize(dataUrl) {
   return Math.floor((base64String.length * 3) / 4) - padding;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function validateReservation(req, res, next) {
   const errors = [];
   const {
-    venueType, name, phone, rentalDate, startTime, endTime,
+    venueType, name, phone, email, rentalDate, startTime, endTime,
     numPerformers, description, referralSources, options
   } = req.body;
 
@@ -104,6 +106,14 @@ export function validateReservation(req, res, next) {
     if (!PHONE_REGEX.test(digits)) {
       errors.push('올바른 전화번호 형식이 아닙니다.');
     }
+  }
+
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    errors.push('이메일은 필수입니다.');
+  } else if (!EMAIL_REGEX.test(email.trim())) {
+    errors.push('올바른 이메일 형식이 아닙니다.');
+  } else if (email.trim().length > 254) {
+    errors.push('이메일은 254자 이내로 입력해주세요.');
   }
 
   if (!rentalDate) {

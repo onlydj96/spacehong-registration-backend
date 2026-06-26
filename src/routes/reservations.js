@@ -19,7 +19,7 @@ const ERROR_MESSAGES = {
 router.post('/', validateReservation, async (req, res, next) => {
   try {
     const {
-      venueType, name, organization, phone, rentalDate, startTime, endTime,
+      venueType, name, organization, phone, email, rentalDate, startTime, endTime,
       numPerformers, description, referralSources, referralOther, options,
       signatureData, termsAgreed
     } = req.body;
@@ -33,6 +33,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       name: name.trim(),
       organization: organization?.trim() || null,
       phone: phone.replace(/[-\s]/g, ''),
+      email: email.trim().toLowerCase(),
       rental_date: rentalDate,
       start_time: startTime,
       end_time: endTime,

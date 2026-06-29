@@ -1,6 +1,17 @@
 import { Resend } from 'resend';
+import { buildQuotePdf, buildContractPdf } from './pdfService.js';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization — 실제 발송 시점에 키 확인 (서버 시작 시 크래시 방지)
+let _resend = null;
+function getResend() {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('[Email] RESEND_API_KEY 환경변수가 설정되지 않았습니다.');
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 const VENUE_LABELS = {
   performance: '공연장',
@@ -131,14 +142,14 @@ function buildEmailHtml(reservation) {
       <div style="background:#fafafa;border-radius:8px;padding:16px 20px;font-size:13px;color:#555;line-height:1.8;">
         <p style="margin:0 0 8px;"><strong style="color:#111;">취소 및 환불 정책</strong></p>
         <ul style="margin:0 0 12px;padding-left:18px;">
-          <li>대관일 45일 전: 전액 환불</li>
-          <li>대관일 30일 전: 50% 환불</li>
-          <li>대관일 14일 전 이후: 환불 불가</li>
+          <li>대관일 기준 45일 전: 전액 환불</li>
+          <li>대관일 기준 45일 이후: 원칙적으로 환불 불가</li>
+          <li>9~12월 성수기: 예약 확정 후 취소·변경·환불 불가</li>
         </ul>
-        <p style="margin:0 0 8px;"><strong style="color:#111;">입금 안내</strong></p>
-        <p style="margin:0 0 12px;">예약 확정 후 3일 이내 입금이 완료되어야 예약이 최종 확정됩니다.</p>
-        <p style="margin:0 0 8px;"><strong style="color:#111;">보증금</strong></p>
-        <p style="margin:0;">입장 시 보증금 100,000원을 납부하며, 퇴장 시 공간 상태 확인 후 환불됩니다.</p>
+        <p style="margin:0 0 8px;"><strong style="color:#111;">청소보증금</strong></p>
+        <p style="margin:0 0 12px;">청소보증금 10만원을 대관료와 함께 선입금하며, 대관 종료 후 현장 확인을 거쳐 영업일 기준 3일 이내 환급됩니다.</p>
+        <p style="margin:0 0 8px;"><strong style="color:#111;">첨부 파일 안내</strong></p>
+        <p style="margin:0;">본 메일에 견적내역서와 이용규정 계약서가 첨부되어 있습니다. 확인 후 보관해주세요.</p>
       </div>
     </div>
 
@@ -174,11 +185,22 @@ export async function sendReservationConfirmEmail(reservation) {
 
   const venueName = VENUE_LABELS[reservation.venue_type] || reservation.venue_type;
 
-  const { data, error } = await resend.emails.send({
+  const [quotePdf, contractPdf] = await Promise.all([
+    buildQuotePdf(reservation),
+    buildContractPdf(reservation),
+  ]);
+
+  const safeName = reservation.name.replace(/[^가-힣a-zA-Z0-9]/g, '_');
+
+  const { data, error } = await getResend().emails.send({
     from: 'Space Hong <noreply@space-hong.com>',
     to: reservation.email,
     subject: `[스페이스홍] ${venueName} 예약이 확정되었습니다`,
     html: buildEmailHtml(reservation),
+    attachments: [
+      { filename: `견적내역서_${safeName}.pdf`,      content: quotePdf },
+      { filename: `이용규정_계약서_${safeName}.pdf`,  content: contractPdf },
+    ],
   });
 
   if (error) {

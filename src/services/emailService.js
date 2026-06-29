@@ -153,15 +153,6 @@ function buildEmailHtml(reservation) {
       </div>
     </div>
 
-    <!-- 서명 -->
-    ${reservation.signature_data ? `
-    <div style="padding:24px 40px 0;">
-      <h3 style="margin:0 0 12px;font-size:14px;color:#888;text-transform:uppercase;letter-spacing:1px;">서명</h3>
-      <div style="border:1px solid #eee;border-radius:8px;padding:12px;display:inline-block;">
-        <img src="${reservation.signature_data}" alt="서명" style="max-width:200px;height:auto;display:block;">
-      </div>
-    </div>` : ''}
-
     <!-- Footer -->
     <div style="padding:32px 40px;margin-top:32px;border-top:1px solid #eee;text-align:center;">
       <p style="margin:0 0 4px;font-size:13px;color:#888;">문의사항이 있으시면 아래로 연락해주세요.</p>

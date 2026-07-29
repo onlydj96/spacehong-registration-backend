@@ -115,7 +115,10 @@ router.post('/', async (req, res, next) => {
       .select('id, submitted_at')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[SiteVisit Error]', error.code, error.message, error.details);
+      throw error;
+    }
 
     res.status(201).json({
       success: true,

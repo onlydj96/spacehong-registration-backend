@@ -4,12 +4,13 @@ export const OPTION_PRICES = {
   multitrack: 100000,
   personalMonitor: 100000,
   extraOperator: 20000,  // per hour
+  drumCleanup: 100000,
 };
 
 // Time constants
 export const TIME_CONSTANTS = {
   MINUTES_PER_HOUR: 60,
-  MIN_RENTAL_HOURS: 2,
+  MIN_RENTAL_HOURS: 5,
   MAX_RENTAL_HOURS: 12,
 };
 
@@ -18,6 +19,7 @@ export const VALIDATION_PATTERNS = {
   PHONE: /^01[016789]\d{7,8}$/,
   TIME: /^([01]\d|2[0-3]):([0-5]\d)$/,
   DATE: /^\d{4}-\d{2}-\d{2}$/,
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 };
 
 /**
@@ -57,6 +59,7 @@ export function calculatePrice(options) {
   if (options.extraCapacity) total += OPTION_PRICES.extraCapacity;
   if (options.multitrack) total += OPTION_PRICES.multitrack;
   if (options.personalMonitor) total += OPTION_PRICES.personalMonitor;
+  if (options.drumCleanup) total += OPTION_PRICES.drumCleanup;
   if (options.extraOperator) {
     const hours = Math.max(0, parseInt(options.extraOperatorHours, 10) || 0);
     total += OPTION_PRICES.extraOperator * hours;

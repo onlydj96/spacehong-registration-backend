@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase.js';
 import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
-import { verifyAdmin, getPaginationParams, sanitizeSearchTerm } from './utils.js';
+import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } from './utils.js';
 
 const router = Router();
 
@@ -58,7 +58,7 @@ router.get('/', verifyAdmin, async (req, res, next) => {
 });
 
 // GET /site-visits/:id - Get single site visit
-router.get('/:id', verifyAdmin, async (req, res, next) => {
+router.get('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -92,7 +92,7 @@ router.get('/:id', verifyAdmin, async (req, res, next) => {
 });
 
 // PATCH /site-visits/:id - Update site visit status
-router.patch('/:id', verifyAdmin, async (req, res, next) => {
+router.patch('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -119,13 +119,16 @@ router.patch('/:id', verifyAdmin, async (req, res, next) => {
 });
 
 // PATCH /site-visits/:id/memo - Update admin memo
-router.patch('/:id/memo', verifyAdmin, async (req, res, next) => {
+router.patch('/:id/memo', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { memo } = req.body;
 
     if (typeof memo !== 'string') {
       return res.status(400).json({ success: false, errors: ['메모는 문자열이어야 합니다.'] });
+    }
+    if (memo.length > 2000) {
+      return res.status(400).json({ success: false, errors: ['메모는 2000자 이내로 입력해주세요.'] });
     }
 
     const { data, error } = await supabase

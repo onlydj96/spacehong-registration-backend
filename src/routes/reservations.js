@@ -49,6 +49,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       opt_extra_operator_hours: options?.extraOperatorHours || 0,
       opt_bar_operation: options?.barOperation || false,
       opt_prompter: options?.prompter || false,
+      opt_drum_cleanup: options?.drumCleanup || false,
       opt_tax_invoice: options?.taxInvoice || false,
       additional_price: additionalPrice,
       total_price: additionalPrice,

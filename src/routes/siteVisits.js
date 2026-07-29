@@ -9,6 +9,8 @@ const VALIDATION = {
   NAME_MAX_LENGTH: 50,
   ORGANIZATION_MAX_LENGTH: 100,
   PURPOSE_DETAIL_MAX_LENGTH: 1000,
+  EMAIL_MAX_LENGTH: 254,
+  EMAIL_REGEX: VALIDATION_PATTERNS.EMAIL,
   PHONE_REGEX: VALIDATION_PATTERNS.PHONE,
   TIME_REGEX: VALIDATION_PATTERNS.TIME,
   DATE_REGEX: VALIDATION_PATTERNS.DATE,
@@ -19,7 +21,7 @@ const VALIDATION = {
 router.post('/', async (req, res, next) => {
   try {
     const {
-      name, organization, phone, rentalDate, startTime, endTime,
+      name, organization, phone, email, rentalDate, startTime, endTime,
       purposes, purposeDetail, hasRental
     } = req.body;
 
@@ -41,6 +43,15 @@ router.post('/', async (req, res, next) => {
       if (!VALIDATION.PHONE_REGEX.test(phoneDigits)) {
         errors.push('올바른 휴대폰 번호 형식이 아닙니다. (예: 010-1234-5678)');
       }
+    }
+
+    // Email validation
+    if (!email?.trim()) {
+      errors.push('이메일을 입력해주세요.');
+    } else if (email.trim().length > VALIDATION.EMAIL_MAX_LENGTH) {
+      errors.push('이메일 주소가 너무 깁니다.');
+    } else if (!VALIDATION.EMAIL_REGEX.test(email.trim())) {
+      errors.push('올바른 이메일 형식이 아닙니다.');
     }
 
     // Date validation
@@ -89,6 +100,7 @@ router.post('/', async (req, res, next) => {
       name: name.trim(),
       organization: organization?.trim() || null,
       phone: phone.replace(/[-\s]/g, ''),
+      email: email.trim().toLowerCase(),
       rental_date: rentalDate,
       start_time: startTime,
       end_time: endTime,

@@ -5,8 +5,9 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase.js';
 import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
-import { verifyAdmin, getPaginationParams, sanitizeSearchTerm } from './utils.js';
+import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } from './utils.js';
 import { sendReservationConfirmEmail } from '../../services/emailService.js';
+import { sendEmailFailureAlert } from '../../services/telegramService.js';
 
 const router = Router();
 
@@ -73,7 +74,7 @@ router.get('/', verifyAdmin, async (req, res, next) => {
 });
 
 // GET /reservations/:id - Get single reservation
-router.get('/:id', verifyAdmin, async (req, res, next) => {
+router.get('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -107,7 +108,7 @@ router.get('/:id', verifyAdmin, async (req, res, next) => {
 });
 
 // PATCH /reservations/:id - Update reservation status
-router.patch('/:id', verifyAdmin, async (req, res, next) => {
+router.patch('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -129,9 +130,12 @@ router.patch('/:id', verifyAdmin, async (req, res, next) => {
     deleteCached(CACHE_KEYS.STATISTICS);
 
     if (status === 'confirmed') {
-      sendReservationConfirmEmail(data).catch(err =>
-        console.error('[Email] 확정 이메일 발송 실패 (예약 id:', id, '):', err.message)
-      );
+      sendReservationConfirmEmail(data).catch(err => {
+        console.error('[Email] 확정 이메일 발송 실패 (예약 id:', id, '):', err.message);
+        sendEmailFailureAlert(data, err.message).catch(tgErr =>
+          console.error('[Telegram] 알림 발송 실패 (예약 id:', id, '):', tgErr.message)
+        );
+      });
     }
 
     res.json({ success: true, data });

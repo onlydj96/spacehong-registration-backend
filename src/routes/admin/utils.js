@@ -77,6 +77,18 @@ export const getPaginationParams = (query) => {
 /**
  * Verify admin token and role
  */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate :id param as UUID
+ */
+export const validateId = (req, res, next) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ success: false, errors: ['유효하지 않은 ID 형식입니다.'] });
+  }
+  next();
+};
+
 export const verifyAdmin = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

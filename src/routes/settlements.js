@@ -54,8 +54,8 @@ router.post('/', async (req, res, next) => {
     // Bank name validation
     if (!bankName?.trim()) {
       errors.push('은행명을 입력해주세요.');
-    } else if (bankName.trim().length > VALIDATION.BANK_NAME_MAX_LENGTH) {
-      errors.push(`은행명은 ${VALIDATION.BANK_NAME_MAX_LENGTH}자 이내로 입력해주세요.`);
+    } else if (!VALIDATION.VALID_BANKS.includes(bankName.trim())) {
+      errors.push('유효하지 않은 은행명입니다.');
     }
 
     // Account holder validation
@@ -114,7 +114,7 @@ router.post('/', async (req, res, next) => {
       bank_name: bankName.trim(),
       account_holder: accountHolder.trim(),
       account_number: accountNumber.trim(),
-      rating,
+      rating: ratingNum,
       good_points: goodPoints?.trim() || null,
       improvements: improvements?.trim() || null,
       media_urls: validatedMediaUrls,

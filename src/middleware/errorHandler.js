@@ -63,7 +63,9 @@ export function errorHandler(err, req, res, next) {
   }
 
   // Handle Supabase/database errors
-  if (err.code && err.message) {
+  // PostgreSQL error codes are 5-digit strings (e.g. '23505'); PostgREST codes start with 'PGRST'
+  const isDbError = typeof err.code === 'string' && (/^\d{5}$/.test(err.code) || err.code.startsWith('PGRST'));
+  if (isDbError) {
     return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
       success: false,
       errors: [ERROR_MESSAGES.DATABASE_ERROR],

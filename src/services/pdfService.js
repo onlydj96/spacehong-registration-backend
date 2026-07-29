@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Operator.Spacehong@gmail.com';
 const FONT_REGULAR = path.join(__dirname, '../assets/fonts/NotoSansKR-Regular.otf');
 const FONT_BOLD    = path.join(__dirname, '../assets/fonts/NotoSansKR-Bold.otf');
 
@@ -17,6 +19,7 @@ const OPTION_LABELS = {
   opt_multitrack:       { label: '멀티트랙 녹음',              price: 100000 },
   opt_personal_monitor: { label: '퍼스널 모니터 / 인이어',      price: 100000 },
   opt_extra_operator:   { label: '추가 오퍼레이터',            price: null   },
+  opt_drum_cleanup:     { label: '무대 드럼 정리',             price: 100000 },
   opt_bar_operation:    { label: '바 운영',                    price: 0      },
   opt_prompter:         { label: '프롬프터',                   price: 0      },
   opt_tax_invoice:      { label: '세금계산서 발행',             price: 0      },
@@ -220,7 +223,7 @@ export async function buildQuotePdf(reservation) {
   doc.moveDown(2);
   divider(doc, W);
   doc.font(FONT_REGULAR).fontSize(8).fillColor('#888888')
-    .text('문의: Operator.Spacehong@gmail.com  |  SPACE HONG · 서울특별시 마포구', { width: W, align: 'center' });
+    .text('문의: ' + CONTACT_EMAIL + '  |  SPACE HONG · 서울특별시 마포구', { width: W, align: 'center' });
 
   return docToBuffer(doc);
 }
@@ -408,7 +411,7 @@ export async function buildContractPdf(reservation) {
   sectionTitle(doc, `2. ${planDoc} 및 공간 세팅 안내`, W);
   body(doc, `${planDoc}는 ${activityWord} 예정일 최소 7일 전까지 제출해주시기 바랍니다.`, W);
   body(doc, `${planDoc}의 세부 양식, 작성 방식 및 제출 안내는 스페이스홍이 이메일로 별도 안내드립니다.`, W);
-  body(doc, '제출 이메일: Operator.Spacehong@gmail.com', W);
+  body(doc, '제출 이메일: ' + CONTACT_EMAIL, W);
   body(doc, `공간 기본 세팅은 사전에 제출된 ${planDoc}를 기준으로 준비됩니다.`, W);
   body(doc, `공간 꾸미기${isStudio ? ', 촬영 진행,' : ', 좌석 설치, 리허설, 공연 진행,'} 정리 및 철수는 모두 대관 시간 내에 진행됩니다.`, W);
   body(doc, '설치물, 장식물, 현수막, 배너, 외부 장비 등이 필요한 경우 사전에 문의해주시기 바랍니다.', W);
@@ -448,7 +451,7 @@ export async function buildContractPdf(reservation) {
   // 문의 (7 or 6)
   sectionTitle(doc, `${hasBar ? '7' : '6'}. 문의`, W);
   body(doc, '대관 진행과 관련하여 궁금한 사항이 있으시면 언제든 스페이스홍으로 문의해주시기 바랍니다.', W);
-  body(doc, '문의 이메일: Operator.Spacehong@gmail.com', W);
+  body(doc, '문의 이메일: ' + CONTACT_EMAIL, W);
 
   body(doc, `최고의 ${activitySubj} 될 수 있도록 스페이스홍이 최선을 다해 돕겠습니다.`, W);
 
@@ -482,7 +485,7 @@ export async function buildContractPdf(reservation) {
   doc.moveDown(2);
   divider(doc, W);
   doc.font(FONT_REGULAR).fontSize(8).fillColor('#888888')
-    .text('문의: Operator.Spacehong@gmail.com  |  SPACE HONG · 서울특별시 마포구', { width: W, align: 'center' });
+    .text('문의: ' + CONTACT_EMAIL + '  |  SPACE HONG · 서울특별시 마포구', { width: W, align: 'center' });
 
   return docToBuffer(doc);
 }

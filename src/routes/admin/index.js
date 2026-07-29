@@ -67,8 +67,8 @@ router.get('/search', verifyAdmin, async (req, res, next) => {
         .limit(searchLimit),
       supabase
         .from('settlements')
-        .select('id, name, rental_date, bank_info, account_number, refund_status, submitted_at')
-        .or(`name.ilike.%${searchTerm}%,bank_info.ilike.%${searchTerm}%`)
+        .select('id, name, rental_date, bank_name, account_number, refund_status, submitted_at')
+        .or(`name.ilike.%${searchTerm}%,bank_name.ilike.%${searchTerm}%`)
         .order('submitted_at', { ascending: false })
         .limit(searchLimit),
     ]);
@@ -98,44 +98,54 @@ router.get('/stats', verifyAdmin, async (req, res, next) => {
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [reservations, siteVisits, settlements] = await Promise.all([
-      supabase.from('reservations').select('status, submitted_at, venue_type, viewed_at'),
-      supabase.from('site_visits').select('status, submitted_at, viewed_at'),
-      supabase.from('settlements').select('refund_status, submitted_at, viewed_at'),
-    ]);
-
-    const reservationsData = reservations.data || [];
-    const siteVisitsData = siteVisits.data || [];
-    const settlementsData = settlements.data || [];
-
-    const getVenueStats = (data, venueType) => {
-      const filtered = data.filter(r => r.venue_type === venueType);
-      return {
-        total: filtered.length,
-        pending: filtered.filter(r => r.status === 'pending').length,
-        recent: filtered.filter(r => r.submitted_at >= thirtyDaysAgo).length,
-        unviewed: filtered.filter(r => r.viewed_at === null).length,
-      };
+    // Use HEAD count queries — no row data fetched, DB-level aggregation
+    const cnt = (table, filters = []) => {
+      let q = supabase.from(table).select('*', { count: 'exact', head: true });
+      for (const [method, ...args] of filters) q = q[method](...args);
+      return q;
     };
+
+    const [
+      perfTotal, perfPending, perfRecent, perfUnviewed,
+      studioTotal, studioPending, studioRecent, studioUnviewed,
+      eventTotal, eventPending, eventRecent, eventUnviewed,
+      svTotal, svPending, svRecent, svUnviewed,
+      settlTotal, settlPending, settlRecent, settlUnviewed,
+    ] = await Promise.all([
+      cnt('reservations', [['eq', 'venue_type', 'performance']]),
+      cnt('reservations', [['eq', 'venue_type', 'performance'], ['eq', 'status', 'pending']]),
+      cnt('reservations', [['eq', 'venue_type', 'performance'], ['gte', 'submitted_at', thirtyDaysAgo]]),
+      cnt('reservations', [['eq', 'venue_type', 'performance'], ['is', 'viewed_at', null]]),
+
+      cnt('reservations', [['eq', 'venue_type', 'studio']]),
+      cnt('reservations', [['eq', 'venue_type', 'studio'], ['eq', 'status', 'pending']]),
+      cnt('reservations', [['eq', 'venue_type', 'studio'], ['gte', 'submitted_at', thirtyDaysAgo]]),
+      cnt('reservations', [['eq', 'venue_type', 'studio'], ['is', 'viewed_at', null]]),
+
+      cnt('reservations', [['eq', 'venue_type', 'event']]),
+      cnt('reservations', [['eq', 'venue_type', 'event'], ['eq', 'status', 'pending']]),
+      cnt('reservations', [['eq', 'venue_type', 'event'], ['gte', 'submitted_at', thirtyDaysAgo]]),
+      cnt('reservations', [['eq', 'venue_type', 'event'], ['is', 'viewed_at', null]]),
+
+      cnt('site_visits', []),
+      cnt('site_visits', [['eq', 'status', 'pending']]),
+      cnt('site_visits', [['gte', 'submitted_at', thirtyDaysAgo]]),
+      cnt('site_visits', [['is', 'viewed_at', null]]),
+
+      cnt('settlements', []),
+      cnt('settlements', [['eq', 'refund_status', 'pending']]),
+      cnt('settlements', [['gte', 'submitted_at', thirtyDaysAgo]]),
+      cnt('settlements', [['is', 'viewed_at', null]]),
+    ]);
 
     const response = {
       success: true,
       data: {
-        performance: getVenueStats(reservationsData, 'performance'),
-        studio: getVenueStats(reservationsData, 'studio'),
-        event: getVenueStats(reservationsData, 'event'),
-        siteVisits: {
-          total: siteVisitsData.length,
-          pending: siteVisitsData.filter(s => s.status === 'pending').length,
-          recent: siteVisitsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
-          unviewed: siteVisitsData.filter(s => s.viewed_at === null).length,
-        },
-        settlements: {
-          total: settlementsData.length,
-          pending: settlementsData.filter(s => s.refund_status === 'pending').length,
-          recent: settlementsData.filter(s => s.submitted_at >= thirtyDaysAgo).length,
-          unviewed: settlementsData.filter(s => s.viewed_at === null).length,
-        },
+        performance: { total: perfTotal.count, pending: perfPending.count, recent: perfRecent.count, unviewed: perfUnviewed.count },
+        studio: { total: studioTotal.count, pending: studioPending.count, recent: studioRecent.count, unviewed: studioUnviewed.count },
+        event: { total: eventTotal.count, pending: eventPending.count, recent: eventRecent.count, unviewed: eventUnviewed.count },
+        siteVisits: { total: svTotal.count, pending: svPending.count, recent: svRecent.count, unviewed: svUnviewed.count },
+        settlements: { total: settlTotal.count, pending: settlPending.count, recent: settlRecent.count, unviewed: settlUnviewed.count },
       },
     };
 
@@ -259,6 +269,13 @@ router.put('/settings', verifyAdmin, async (req, res, next) => {
 router.get('/statistics', verifyAdmin, async (req, res, next) => {
   try {
     const { period = 'monthly' } = req.query;
+
+    const cacheKey = `${CACHE_KEYS.STATISTICS}:${period}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const now = new Date();
 
     // Calculate date ranges based on period
@@ -389,7 +406,7 @@ router.get('/statistics', verifyAdmin, async (req, res, next) => {
     const settlementsChange = calculateChange(currentMonthSettlements, prevSettlementsCount);
     const conversionChange = conversionRate - prevConversionRate;
 
-    res.json({
+    const response = {
       success: true,
       data: {
         summary: {
@@ -406,7 +423,10 @@ router.get('/statistics', verifyAdmin, async (req, res, next) => {
         venueTypeDistribution,
         statusDistribution,
       },
-    });
+    };
+
+    setCached(cacheKey, response, CACHE_TTL.STATISTICS);
+    res.json(response);
   } catch (err) {
     next(err);
   }

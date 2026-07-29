@@ -6,13 +6,15 @@ const NEXT_DAY_TIME_REGEX = /^익일 ([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 // XSS 방지를 위한 위험 패턴
+// Note: g 플래그 미사용 — .test()로 존재 여부만 확인하므로 stateful lastIndex 불필요
+// g 플래그가 있으면 연속 호출 시 lastIndex가 전진하여 교대로 검증이 우회됨
 const DANGEROUS_PATTERNS = [
-  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-  /javascript:/gi,
-  /on\w+\s*=/gi,
-  /<iframe/gi,
-  /<object/gi,
-  /<embed/gi,
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/i,
+  /javascript:/i,
+  /on\w+\s*=/i,
+  /<iframe/i,
+  /<object/i,
+  /<embed/i,
 ];
 
 /**
@@ -39,7 +41,7 @@ function sanitizeString(value) {
 }
 
 // 환경변수에서 설정값 로드 (기본값 제공)
-const ALLOWED_REFERRALS = (process.env.ALLOWED_REFERRALS || '스페이스클라우드,아워플레이스,네이버,인스타,기타')
+const ALLOWED_REFERRALS = (process.env.ALLOWED_REFERRALS || '스페이스클라우드,아워플레이스,네이버,인스타,지인 추천,기타')
   .split(',')
   .map(s => s.trim());
 const ALLOWED_VENUE_TYPES = (process.env.ALLOWED_VENUE_TYPES || 'performance,event,studio')
@@ -193,7 +195,7 @@ export function validateReservation(req, res, next) {
   }
 
   if (options && typeof options === 'object') {
-    const boolFields = ['extraCapacity', 'multitrack', 'personalMonitor', 'extraOperator', 'barOperation', 'prompter', 'taxInvoice'];
+    const boolFields = ['extraCapacity', 'multitrack', 'personalMonitor', 'extraOperator', 'barOperation', 'prompter', 'drumCleanup', 'taxInvoice'];
     for (const field of boolFields) {
       if (options[field] !== undefined && typeof options[field] !== 'boolean') {
         errors.push(`옵션 "${field}"는 true/false 값이어야 합니다.`);

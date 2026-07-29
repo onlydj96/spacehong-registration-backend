@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase.js';
 import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
-import { verifyAdmin, getPaginationParams, sanitizeSearchTerm } from './utils.js';
+import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } from './utils.js';
 
 const router = Router();
 
@@ -23,7 +23,7 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     if (search) {
       const sanitized = sanitizeSearchTerm(search);
       if (sanitized) {
-        query = query.or(`name.ilike.%${sanitized}%,bank_info.ilike.%${sanitized}%`);
+        query = query.or(`name.ilike.%${sanitized}%,bank_name.ilike.%${sanitized}%`);
       }
     }
     if (startDate) {
@@ -58,7 +58,7 @@ router.get('/', verifyAdmin, async (req, res, next) => {
 });
 
 // GET /settlements/:id - Get single settlement
-router.get('/:id', verifyAdmin, async (req, res, next) => {
+router.get('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -92,7 +92,7 @@ router.get('/:id', verifyAdmin, async (req, res, next) => {
 });
 
 // PATCH /settlements/:id - Update settlement refund status
-router.patch('/:id', verifyAdmin, async (req, res, next) => {
+router.patch('/:id', verifyAdmin, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { refundStatus } = req.body;

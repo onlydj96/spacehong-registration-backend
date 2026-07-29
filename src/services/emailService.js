@@ -1,6 +1,10 @@
 import { Resend } from 'resend';
 import { buildQuotePdf, buildContractPdf } from './pdfService.js';
 
+// 발신 주소·연락처 — 환경변수로 관리
+const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Space Hong <noreply@space-hong.com>';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Operator.Spacehong@gmail.com';
+
 // Lazy initialization — 실제 발송 시점에 키 확인 (서버 시작 시 크래시 방지)
 let _resend = null;
 function getResend() {
@@ -20,13 +24,14 @@ const VENUE_LABELS = {
 };
 
 const OPTION_LABELS = {
-  opt_extra_capacity:    { label: '수용인원 50명 이상', price: 100000 },
-  opt_multitrack:        { label: '멀티트랙 녹음',      price: 100000 },
-  opt_personal_monitor:  { label: '퍼스널 모니터 / 인이어', price: 100000 },
-  opt_extra_operator:    { label: '추가 오퍼레이터',    price: null },  // 시간당
-  opt_bar_operation:     { label: '바 운영',            price: 0 },
-  opt_prompter:          { label: '프롬프터',           price: 0 },
-  opt_tax_invoice:       { label: '세금계산서 발행',    price: 0 },
+  opt_extra_capacity:    { label: '수용인원 50명 이상',        price: 100000 },
+  opt_multitrack:        { label: '멀티트랙 녹음',            price: 100000 },
+  opt_personal_monitor:  { label: '퍼스널 모니터 / 인이어',   price: 100000 },
+  opt_extra_operator:    { label: '추가 오퍼레이터',          price: null   },  // 시간당
+  opt_drum_cleanup:      { label: '무대 드럼 정리',           price: 100000 },
+  opt_bar_operation:     { label: '바 운영',                  price: 0      },
+  opt_prompter:          { label: '프롬프터',                 price: 0      },
+  opt_tax_invoice:       { label: '세금계산서 발행',          price: 0      },
 };
 
 function formatKRW(amount) {
@@ -37,6 +42,16 @@ function formatDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}요일)`;
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function buildOptionsHtml(reservation) {
@@ -67,7 +82,13 @@ function buildOptionsHtml(reservation) {
 }
 
 function buildEmailHtml(reservation) {
-  const venueName = VENUE_LABELS[reservation.venue_type] || reservation.venue_type;
+  const venueName = VENUE_LABELS[reservation.venue_type] || escapeHtml(reservation.venue_type);
+  const name = escapeHtml(reservation.name);
+  const organization = escapeHtml(reservation.organization);
+  const phone = escapeHtml(reservation.phone);
+  const startTime = escapeHtml(reservation.start_time);
+  const endTime = escapeHtml(reservation.end_time);
+  const rentalHours = escapeHtml(reservation.rental_hours);
   const additionalPrice = reservation.additional_price || 0;
 
   return `<!DOCTYPE html>
@@ -84,7 +105,7 @@ function buildEmailHtml(reservation) {
 
     <!-- Greeting -->
     <div style="padding:32px 40px 0;">
-      <h2 style="margin:0 0 8px;font-size:18px;color:#111;">안녕하세요, ${reservation.name}님</h2>
+      <h2 style="margin:0 0 8px;font-size:18px;color:#111;">안녕하세요, ${name}님</h2>
       <p style="margin:0;color:#555;font-size:14px;line-height:1.7;">
         스페이스홍 <strong>${venueName}</strong> 예약이 확정되었습니다.<br>
         아래에서 예약 정보 및 견적 내역을 확인해주세요.
@@ -105,15 +126,15 @@ function buildEmailHtml(reservation) {
         </tr>
         <tr style="background:#fafafa;">
           <td style="padding:10px 12px;color:#888;">대관 시간</td>
-          <td style="padding:10px 12px;color:#111;">${reservation.start_time} ~ ${reservation.end_time} (${reservation.rental_hours}시간)</td>
+          <td style="padding:10px 12px;color:#111;">${startTime} ~ ${endTime} (${rentalHours}시간)</td>
         </tr>
         <tr>
           <td style="padding:10px 12px;color:#888;">예약자</td>
-          <td style="padding:10px 12px;color:#111;">${reservation.name}${reservation.organization ? ` (${reservation.organization})` : ''}</td>
+          <td style="padding:10px 12px;color:#111;">${name}${organization ? ` (${organization})` : ''}</td>
         </tr>
         <tr style="background:#fafafa;">
           <td style="padding:10px 12px;color:#888;">연락처</td>
-          <td style="padding:10px 12px;color:#111;">${reservation.phone}</td>
+          <td style="padding:10px 12px;color:#111;">${phone}</td>
         </tr>
       </table>
     </div>
@@ -158,7 +179,7 @@ function buildEmailHtml(reservation) {
       <p style="margin:0 0 4px;font-size:13px;color:#888;">문의사항이 있으시면 아래로 연락해주세요.</p>
       <p style="margin:0;font-size:13px;color:#555;">
         <strong>SPACE HONG</strong> · 서울특별시 마포구 ·
-        <a href="mailto:Operator.Spacehong@gmail.com" style="color:#555;">Operator.Spacehong@gmail.com</a>
+        <a href="mailto:${CONTACT_EMAIL}" style="color:#555;">${CONTACT_EMAIL}</a>
       </p>
       <p style="margin:12px 0 0;font-size:11px;color:#bbb;">본 메일은 발신 전용입니다.</p>
     </div>
@@ -170,8 +191,9 @@ function buildEmailHtml(reservation) {
 
 export async function sendReservationConfirmEmail(reservation) {
   if (!reservation.email) {
-    console.warn('[Email] 이메일 주소 없음, 발송 건너뜀 id:', reservation.id);
-    return;
+    const err = new Error(`[Email] 이메일 주소 없음 — 예약 id: ${reservation.id}`);
+    err.code = 'EMAIL_MISSING';
+    throw err;
   }
 
   const venueName = VENUE_LABELS[reservation.venue_type] || reservation.venue_type;
@@ -184,7 +206,7 @@ export async function sendReservationConfirmEmail(reservation) {
   const safeName = reservation.name.replace(/[^가-힣a-zA-Z0-9]/g, '_');
 
   const { data, error } = await getResend().emails.send({
-    from: 'Space Hong <noreply@space-hong.com>',
+    from: FROM_ADDRESS,
     to: reservation.email,
     subject: `[스페이스홍] ${venueName} 예약이 확정되었습니다`,
     html: buildEmailHtml(reservation),

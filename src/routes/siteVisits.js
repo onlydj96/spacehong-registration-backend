@@ -59,6 +59,14 @@ router.post('/', async (req, res, next) => {
       errors.push('대관 희망 날짜를 선택해주세요.');
     } else if (!VALIDATION.DATE_REGEX.test(rentalDate)) {
       errors.push('올바른 날짜 형식이 아닙니다.');
+    } else {
+      const date = new Date(rentalDate);
+      date.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (isNaN(date.getTime()) || date <= today) {
+        errors.push('대관 희망 날짜는 오늘 이후여야 합니다.');
+      }
     }
 
     // Time validation

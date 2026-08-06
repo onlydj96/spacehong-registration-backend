@@ -22,29 +22,6 @@ export function clearCache() {
   return cache.flushAll();
 }
 
-export function cacheMiddleware(keyGenerator, ttl = 300) {
-  return (req, res, next) => {
-    const key = typeof keyGenerator === 'function'
-      ? keyGenerator(req)
-      : keyGenerator;
-
-    const cached = getCached(key);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    const originalJson = res.json.bind(res);
-    res.json = (data) => {
-      if (res.statusCode === 200 && data.success !== false) {
-        setCached(key, data, ttl);
-      }
-      return originalJson(data);
-    };
-
-    next();
-  };
-}
-
 export const CACHE_KEYS = {
   STATISTICS: 'admin:statistics',
   RESERVATIONS_LIST: 'admin:reservations:list',

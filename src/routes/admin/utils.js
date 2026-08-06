@@ -75,6 +75,35 @@ export const getPaginationParams = (query) => {
 // ===== Middleware =====
 
 /**
+ * 토큰 → 유저 정보 단기 캐시 (30초)
+ * 동일 토큰의 연속 요청마다 Supabase 네트워크 호출을 줄이기 위함
+ * TTL이 짧으므로 로그아웃 후 최대 30초 내 만료됨
+ */
+const TOKEN_CACHE_TTL_MS = 30 * 1000;
+const tokenCache = new Map(); // Map<token, { user, expiresAt }>
+
+function getTokenCache(token) {
+  const entry = tokenCache.get(token);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    tokenCache.delete(token);
+    return null;
+  }
+  return entry.user;
+}
+
+function setTokenCache(token, user) {
+  // 캐시 크기 제한 (최대 500개) — 만료 항목 일괄 정리 후 추가
+  if (tokenCache.size >= 500) {
+    const now = Date.now();
+    for (const [k, v] of tokenCache.entries()) {
+      if (now > v.expiresAt) tokenCache.delete(k);
+    }
+  }
+  tokenCache.set(token, { user, expiresAt: Date.now() + TOKEN_CACHE_TTL_MS });
+}
+
+/**
  * Verify admin token and role
  */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -97,6 +126,13 @@ export const verifyAdmin = async (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
 
+  // 캐시에 유효한 유저 정보가 있으면 Supabase 네트워크 호출 생략
+  const cachedUser = getTokenCache(token);
+  if (cachedUser) {
+    req.user = cachedUser;
+    return next();
+  }
+
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
@@ -116,6 +152,7 @@ export const verifyAdmin = async (req, res, next) => {
       return res.status(403).json({ success: false, errors: ['관리자 권한이 없습니다.'] });
     }
 
+    setTokenCache(token, user);
     req.user = user;
     next();
   } catch (err) {

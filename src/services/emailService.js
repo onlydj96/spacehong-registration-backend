@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { buildQuotePdf, buildContractPdf } from './pdfService.js';
+import { VENUE_LABELS } from '../utils/constants.js';
 
 // 발신 주소·연락처 — 환경변수로 관리
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Space Hong <noreply@space-hong.com>';
@@ -16,12 +17,6 @@ function getResend() {
   }
   return _resend;
 }
-
-const VENUE_LABELS = {
-  performance: '공연장',
-  studio: '스튜디오',
-  event: '행사장',
-};
 
 const OPTION_LABELS = {
   opt_extra_capacity:    { label: '수용인원 50명 이상',        price: 100000 },

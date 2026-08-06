@@ -20,7 +20,15 @@ router.get('/', verifyAdmin, async (req, res, next) => {
 
     let query = supabase
       .from('reservations')
-      .select('*', { count: 'exact' });
+      .select(
+        'id, venue_type, name, organization, phone, email, rental_date, start_time, end_time, ' +
+        'rental_hours, num_performers, description, referral_sources, referral_other, ' +
+        'opt_extra_capacity, opt_multitrack, opt_personal_monitor, opt_extra_operator, ' +
+        'opt_extra_operator_hours, opt_bar_operation, opt_prompter, opt_drum_cleanup, ' +
+        'opt_tax_invoice, additional_price, total_price, terms_agreed, terms_agreed_at, ' +
+        'status, submitted_at, viewed_at',
+        { count: 'exact' }
+      );
 
     // Venue type filtering (공연장, 스튜디오, 행사장)
     if (venueType) {

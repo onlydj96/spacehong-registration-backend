@@ -2,6 +2,22 @@ import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
 import { VALIDATION_PATTERNS } from '../utils/helpers.js';
 
+// XSS 방지를 위한 위험 패턴 (validation.js와 동일)
+// Note: g 플래그 미사용 — .test()로 존재 여부만 확인하므로 stateful lastIndex 불필요
+const DANGEROUS_PATTERNS = [
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/i,
+  /javascript:/i,
+  /on\w+\s*=/i,
+  /<iframe/i,
+  /<object/i,
+  /<embed/i,
+];
+
+function containsDangerousPatterns(value) {
+  if (!value || typeof value !== 'string') return false;
+  return DANGEROUS_PATTERNS.some(pattern => pattern.test(value));
+}
+
 const router = Router();
 
 // Input validation constants
@@ -81,15 +97,27 @@ router.post('/', async (req, res, next) => {
       errors.push('만족도를 선택해주세요. (1-5)');
     }
 
-    // Feedback length validation (optional fields)
-    if (goodPoints && goodPoints.trim().length > VALIDATION.FEEDBACK_MAX_LENGTH) {
-      errors.push(`좋았던 점은 ${VALIDATION.FEEDBACK_MAX_LENGTH}자 이내로 입력해주세요.`);
+    // Feedback length + XSS validation (optional fields)
+    if (goodPoints && typeof goodPoints === 'string') {
+      if (goodPoints.trim().length > VALIDATION.FEEDBACK_MAX_LENGTH) {
+        errors.push(`좋았던 점은 ${VALIDATION.FEEDBACK_MAX_LENGTH}자 이내로 입력해주세요.`);
+      } else if (containsDangerousPatterns(goodPoints)) {
+        errors.push('좋았던 점에 허용되지 않는 내용이 포함되어 있습니다.');
+      }
     }
-    if (improvements && improvements.trim().length > VALIDATION.FEEDBACK_MAX_LENGTH) {
-      errors.push(`개선사항은 ${VALIDATION.FEEDBACK_MAX_LENGTH}자 이내로 입력해주세요.`);
+    if (improvements && typeof improvements === 'string') {
+      if (improvements.trim().length > VALIDATION.FEEDBACK_MAX_LENGTH) {
+        errors.push(`개선사항은 ${VALIDATION.FEEDBACK_MAX_LENGTH}자 이내로 입력해주세요.`);
+      } else if (containsDangerousPatterns(improvements)) {
+        errors.push('개선사항에 허용되지 않는 내용이 포함되어 있습니다.');
+      }
     }
-    if (instagramRequest && instagramRequest.trim().length > VALIDATION.INSTAGRAM_REQUEST_MAX_LENGTH) {
-      errors.push(`인스타그램 요청사항은 ${VALIDATION.INSTAGRAM_REQUEST_MAX_LENGTH}자 이내로 입력해주세요.`);
+    if (instagramRequest && typeof instagramRequest === 'string') {
+      if (instagramRequest.trim().length > VALIDATION.INSTAGRAM_REQUEST_MAX_LENGTH) {
+        errors.push(`인스타그램 요청사항은 ${VALIDATION.INSTAGRAM_REQUEST_MAX_LENGTH}자 이내로 입력해주세요.`);
+      } else if (containsDangerousPatterns(instagramRequest)) {
+        errors.push('인스타그램 요청사항에 허용되지 않는 내용이 포함되어 있습니다.');
+      }
     }
 
     // Media URLs validation (optional)

@@ -1,4 +1,4 @@
-import { parseMinutes } from '../utils/helpers.js';
+import { parseMinutes, TIME_CONSTANTS } from '../utils/helpers.js';
 
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -25,19 +25,6 @@ const DANGEROUS_PATTERNS = [
 function containsDangerousPatterns(value) {
   if (!value || typeof value !== 'string') return false;
   return DANGEROUS_PATTERNS.some(pattern => pattern.test(value));
-}
-
-/**
- * 문자열 sanitization (HTML 태그 제거)
- * @param {string} value - 정제할 문자열
- * @returns {string} - 정제된 문자열
- */
-function sanitizeString(value) {
-  if (!value || typeof value !== 'string') return value;
-  return value
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .trim();
 }
 
 // 환경변수에서 설정값 로드 (기본값 제공)
@@ -165,8 +152,10 @@ export function validateReservation(req, res, next) {
       errors.push('종료 시간은 시작 시간보다 늦어야 합니다.');
     } else {
       const hours = (endMin - startMin) / 60;
-      if (hours < 5) {
-        errors.push('대관시간은 최소 5시간 이상이어야 합니다.');
+      if (hours < TIME_CONSTANTS.MIN_RENTAL_HOURS) {
+        errors.push(`대관시간은 최소 ${TIME_CONSTANTS.MIN_RENTAL_HOURS}시간 이상이어야 합니다.`);
+      } else if (hours > TIME_CONSTANTS.MAX_RENTAL_HOURS) {
+        errors.push(`대관시간은 최대 ${TIME_CONSTANTS.MAX_RENTAL_HOURS}시간을 초과할 수 없습니다.`);
       }
     }
   }

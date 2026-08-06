@@ -1,5 +1,6 @@
 // Telegram Bot API 알림 서비스
 // 이메일 발송 실패 시 관리자에게 개인 DM으로 알림 전송
+import { VENUE_LABELS } from '../utils/constants.js';
 
 // 지연 초기화 — 서버 시작 시 크래시 방지, 첫 호출 시점에 환경변수 확인
 let _initialized = false;
@@ -27,12 +28,6 @@ function getTelegramConfig() {
   if (!_botToken || !_chatId) return null;
   return { botToken: _botToken, chatId: _chatId };
 }
-
-const VENUE_LABELS = {
-  performance: '공연장',
-  studio: '스튜디오',
-  event: '행사장',
-};
 
 // Telegram HTML parse_mode 이스케이프 (& < > 처리)
 function escapeTg(str) {

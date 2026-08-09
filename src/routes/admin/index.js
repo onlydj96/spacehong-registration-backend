@@ -20,6 +20,7 @@ import { verifyAdmin, getPaginationParams, sanitizeSearchTerm, CACHE_TTL } from 
 import reservationsRouter from './reservations.js';
 import siteVisitsRouter from './siteVisits.js';
 import settlementsRouter from './settlements.js';
+import analyticsRouter from './analytics.js';
 
 const router = Router();
 
@@ -27,6 +28,7 @@ const router = Router();
 router.use('/reservations', reservationsRouter);
 router.use('/site-visits', siteVisitsRouter);
 router.use('/settlements', settlementsRouter);
+router.use('/analytics', analyticsRouter);
 
 // ===== Search =====
 

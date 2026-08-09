@@ -27,6 +27,7 @@ export const CACHE_KEYS = {
   RESERVATIONS_LIST: 'admin:reservations:list',
   SITE_VISITS_LIST: 'admin:sitevisits:list',
   SETTLEMENTS_LIST: 'admin:settlements:list',
+  ANALYTICS: 'admin:analytics',
 };
 
 export default cache;

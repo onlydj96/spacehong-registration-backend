@@ -7,6 +7,7 @@ import healthRouter from './routes/health.js';
 import reservationsRouter from './routes/reservations.js';
 import siteVisitsRouter from './routes/siteVisits.js';
 import settlementsRouter from './routes/settlements.js';
+import analyticsRouter from './routes/analytics.js';
 import adminRouter from './routes/admin/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/logger.js';
@@ -69,6 +70,17 @@ const adminLimiter = rateLimit({
   keyGenerator: generateRateLimitKey,
 });
 
+// Rate limiter for analytics tracking (public, lightweight — fire-and-forget)
+const analyticsLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 page views per minute per IP
+  message: { success: true }, // Never block UX — return success even on limit
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: generateRateLimitKey,
+  skipFailedRequests: true,
+});
+
 // Rate limiter for search endpoint (prevent abuse)
 const searchLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
@@ -80,6 +92,7 @@ const searchLimiter = rateLimit({
 });
 
 app.use('/api/health', healthRouter);
+app.use('/api/analytics', analyticsLimiter, analyticsRouter);
 app.use('/api/reservations', submissionLimiter, reservationsRouter);
 app.use('/api/site-visits', submissionLimiter, siteVisitsRouter);
 app.use('/api/settlements', submissionLimiter, settlementsRouter);

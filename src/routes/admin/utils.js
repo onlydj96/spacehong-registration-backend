@@ -7,9 +7,9 @@ import { supabase } from '../../services/supabase.js';
 // ===== Constants =====
 
 export const CACHE_TTL = {
-  STATS: 60,
-  STATISTICS: 300,
-  LIST: 30,
+  STATS: 300,       // 5분 (기존 60초 → 반복 조회 시 DB 재조회 방지)
+  STATISTICS: 300,  // 5분 (유지)
+  LIST: 120,        // 2분 (기존 30초 → 프론트엔드 캐시와 일치)
 };
 
 export const PAGINATION = {

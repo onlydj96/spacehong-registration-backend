@@ -9,6 +9,7 @@ import siteVisitsRouter from './routes/siteVisits.js';
 import settlementsRouter from './routes/settlements.js';
 import analyticsRouter from './routes/analytics.js';
 import adminRouter from './routes/admin/index.js';
+import testimonialsRouter from './routes/testimonials.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/logger.js';
 
@@ -92,6 +93,7 @@ const searchLimiter = rateLimit({
 });
 
 app.use('/api/health', healthRouter);
+app.use('/api/testimonials', testimonialsRouter);
 app.use('/api/analytics', analyticsLimiter, analyticsRouter);
 app.use('/api/reservations', submissionLimiter, reservationsRouter);
 app.use('/api/site-visits', submissionLimiter, siteVisitsRouter);

@@ -3,6 +3,7 @@
  * 공통 상수, 유틸리티 함수, 미들웨어
  */
 import { supabase } from '../../services/supabase.js';
+import { logger } from '../../middleware/logger.js';
 
 // ===== Constants =====
 
@@ -27,11 +28,7 @@ export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
 
 // Security warning if no email whitelist is configured
 if (ADMIN_EMAILS.length === 0 && process.env.NODE_ENV === 'production') {
-  console.warn(
-    '[SECURITY WARNING] ADMIN_EMAILS environment variable is not set. ' +
-    'Admin access will only be allowed via user metadata role. ' +
-    'Set ADMIN_EMAILS for additional security layer.'
-  );
+  logger.warn('[SECURITY WARNING] ADMIN_EMAILS 환경변수가 설정되지 않았습니다. Admin 접근은 user metadata role로만 허용됩니다. 추가 보안을 위해 ADMIN_EMAILS를 설정하세요.');
 }
 
 // ===== Utility Functions =====
@@ -93,11 +90,16 @@ function getTokenCache(token) {
 }
 
 function setTokenCache(token, user) {
-  // 캐시 크기 제한 (최대 500개) — 만료 항목 일괄 정리 후 추가
+  // 만료 항목 먼저 정리
   if (tokenCache.size >= 500) {
     const now = Date.now();
     for (const [k, v] of tokenCache.entries()) {
       if (now > v.expiresAt) tokenCache.delete(k);
+    }
+    // 만료 항목 정리 후에도 500개를 초과하면 가장 오래된 항목 제거 (하드 제한)
+    if (tokenCache.size >= 500) {
+      const oldestKey = tokenCache.keys().next().value;
+      tokenCache.delete(oldestKey);
     }
   }
   tokenCache.set(token, { user, expiresAt: Date.now() + TOKEN_CACHE_TTL_MS });
@@ -148,7 +150,7 @@ export const verifyAdmin = async (req, res, next) => {
     // SECURITY: Require at least one authentication method
     if (!isAdminByEmail && !isAdminByRole) {
       // Log failed admin access attempt for security monitoring
-      console.warn(`[SECURITY] Admin access denied for user: ${userEmail || 'unknown'}`);
+      logger.warn({ email: userEmail || 'unknown' }, '[SECURITY] Admin access denied');
       return res.status(403).json({ success: false, errors: ['관리자 권한이 없습니다.'] });
     }
 

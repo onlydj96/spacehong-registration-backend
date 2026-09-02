@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
 import { VALIDATION_PATTERNS } from '../utils/helpers.js';
+import { logger } from '../middleware/logger.js';
 
 const router = Router();
 
@@ -124,7 +125,7 @@ router.post('/', async (req, res, next) => {
       .single();
 
     if (error) {
-      console.error('[SiteVisit Error]', error.code, error.message, error.details);
+      logger.error({ code: error.code, message: error.message, details: error.details }, '[SiteVisit Error]');
       throw error;
     }
 

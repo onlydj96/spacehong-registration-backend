@@ -223,39 +223,18 @@ router.put('/settings', verifyAdmin, async (req, res, next) => {
       return res.status(400).json({ success: false, errors: ['유효하지 않은 전화번호 형식입니다.'] });
     }
 
-    const { data: existing } = await supabase
+    const result = await supabase
       .from('admin_settings')
-      .select('id')
-      .eq('user_id', req.user.id)
+      .upsert({
+        user_id: req.user.id,
+        phone_number: phone_number || '',
+        notification_reservation: notification_reservation ?? true,
+        notification_site_visit: notification_site_visit ?? true,
+        notification_settlement: notification_settlement ?? true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+      .select()
       .single();
-
-    let result;
-    if (existing) {
-      result = await supabase
-        .from('admin_settings')
-        .update({
-          phone_number: phone_number || '',
-          notification_reservation: notification_reservation ?? true,
-          notification_site_visit: notification_site_visit ?? true,
-          notification_settlement: notification_settlement ?? true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', req.user.id)
-        .select()
-        .single();
-    } else {
-      result = await supabase
-        .from('admin_settings')
-        .insert({
-          user_id: req.user.id,
-          phone_number: phone_number || '',
-          notification_reservation: notification_reservation ?? true,
-          notification_site_visit: notification_site_visit ?? true,
-          notification_settlement: notification_settlement ?? true,
-        })
-        .select()
-        .single();
-    }
 
     if (result.error) throw result.error;
 

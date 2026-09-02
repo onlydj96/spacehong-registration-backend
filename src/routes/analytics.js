@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
+import { logger } from '../middleware/logger.js';
 
 const router = Router();
 
-// 추적 허용 경로 화이트리스트
+// 추적 허용 경로 화이트리스트 — App.jsx 라우트와 동기화 유지
 const ALLOWED_PATHS = new Set([
   '/', '/rental', '/site-visit', '/settlement',
   '/about', '/space', '/facility', '/quote', '/tour',
+  '/faq', '/contact', '/info',
 ]);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,13 +58,13 @@ router.post('/pageview', async (req, res) => {
 
     if (error) {
       // DB 오류는 로그만 남기고 클라이언트에 성공 반환 (fire-and-forget)
-      console.error('[Analytics] 방문 기록 저장 실패:', error.message);
+      logger.error({ err: error }, '[Analytics] 방문 기록 저장 실패');
     }
 
     res.json({ success: true });
   } catch (err) {
     // 예외 발생 시에도 클라이언트 UX에 영향 없도록 성공 반환
-    console.error('[Analytics] 예외 발생:', err.message);
+    logger.error({ err }, '[Analytics] 예외 발생');
     res.json({ success: true });
   }
 });

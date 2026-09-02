@@ -8,6 +8,7 @@ import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
 import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } from './utils.js';
 import { sendReservationConfirmEmail } from '../../services/emailService.js';
 import { sendEmailFailureAlert } from '../../services/telegramService.js';
+import { logger } from '../../middleware/logger.js';
 
 const router = Router();
 
@@ -139,9 +140,9 @@ router.patch('/:id', verifyAdmin, validateId, async (req, res, next) => {
 
     if (status === 'confirmed') {
       sendReservationConfirmEmail(data).catch(err => {
-        console.error('[Email] 확정 이메일 발송 실패 (예약 id:', id, '):', err.message);
+        logger.error({ reservationId: id, err }, '[Email] 확정 이메일 발송 실패');
         sendEmailFailureAlert(data, err.message).catch(tgErr =>
-          console.error('[Telegram] 알림 발송 실패 (예약 id:', id, '):', tgErr.message)
+          logger.error({ reservationId: id, err: tgErr }, '[Telegram] 알림 발송 실패')
         );
       });
     }

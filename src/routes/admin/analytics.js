@@ -106,12 +106,14 @@ router.get('/', verifyAdmin, async (req, res, next) => {
         .select('session_id, page_path, page_name, step, created_at')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: true }),
+        .order('created_at', { ascending: true })
+        .limit(10000),
       supabase
         .from('page_views')
         .select('session_id')
         .gte('created_at', prevStartDate.toISOString())
-        .lte('created_at', prevEndDate.toISOString()),
+        .lte('created_at', prevEndDate.toISOString())
+        .limit(10000),
     ]);
 
     if (error) throw error;

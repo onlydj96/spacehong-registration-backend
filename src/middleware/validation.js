@@ -82,10 +82,16 @@ export function validateReservation(req, res, next) {
     errors.push('성함은 필수입니다.');
   } else if (name.trim().length > MAX_NAME_LENGTH) {
     errors.push(`성함은 ${MAX_NAME_LENGTH}자 이내로 입력해주세요.`);
+  } else if (containsDangerousPatterns(name)) {
+    errors.push('성함에 허용되지 않는 내용이 포함되어 있습니다.');
   }
 
-  if (req.body.organization && typeof req.body.organization === 'string' && req.body.organization.trim().length > 200) {
-    errors.push('소속은 200자 이내로 입력해주세요.');
+  if (req.body.organization && typeof req.body.organization === 'string') {
+    if (req.body.organization.trim().length > 200) {
+      errors.push('소속은 200자 이내로 입력해주세요.');
+    } else if (containsDangerousPatterns(req.body.organization)) {
+      errors.push('소속에 허용되지 않는 내용이 포함되어 있습니다.');
+    }
   }
 
   if (!phone) {
@@ -180,6 +186,16 @@ export function validateReservation(req, res, next) {
       if (!ALLOWED_REFERRALS.includes(src)) {
         errors.push(`유입경로 "${src}"는 유효하지 않습니다.`);
       }
+    }
+  }
+
+  // referralOther: "기타" 선택 시 상세 내용 XSS 검사
+  const { referralOther } = req.body;
+  if (referralOther && typeof referralOther === 'string') {
+    if (referralOther.trim().length > 100) {
+      errors.push('유입경로 기타 내용은 100자 이내로 입력해주세요.');
+    } else if (containsDangerousPatterns(referralOther)) {
+      errors.push('유입경로 기타 내용에 허용되지 않는 내용이 포함되어 있습니다.');
     }
   }
 

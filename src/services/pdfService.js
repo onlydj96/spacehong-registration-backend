@@ -1,40 +1,14 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { VENUE_LABELS } from '../utils/constants.js';
+import { OPTION_LABELS, formatKRW, formatDate } from '../utils/documentHelpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Operator.Spacehong@gmail.com';
 const FONT_REGULAR = path.join(__dirname, '../assets/fonts/NotoSansKR-Regular.otf');
 const FONT_BOLD    = path.join(__dirname, '../assets/fonts/NotoSansKR-Bold.otf');
-
-const VENUE_LABELS = {
-  performance: '공연장',
-  studio:      '스튜디오',
-  event:       '행사장',
-};
-
-const OPTION_LABELS = {
-  opt_extra_capacity:   { label: '수용인원 50명 이상',          price: 100000 },
-  opt_multitrack:       { label: '멀티트랙 녹음',              price: 100000 },
-  opt_personal_monitor: { label: '퍼스널 모니터 / 인이어',      price: 100000 },
-  opt_extra_operator:   { label: '추가 오퍼레이터',            price: null   },
-  opt_drum_cleanup:     { label: '무대 드럼 정리',             price: 100000 },
-  opt_bar_operation:    { label: '바 운영',                    price: 0      },
-  opt_prompter:         { label: '프롬프터',                   price: 0      },
-  opt_tax_invoice:      { label: '세금계산서 발행',             price: 0      },
-};
-
-function formatKRW(amount) {
-  const man = amount / 10000;
-  return `${man % 1 === 0 ? man : man.toFixed(1)}만원`;
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}요일)`;
-}
 
 function venueVars(venue) {
   const isStudio = venue === 'studio';

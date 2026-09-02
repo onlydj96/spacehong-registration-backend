@@ -1,6 +1,7 @@
 // Telegram Bot API 알림 서비스
 // 이메일 발송 실패 시 관리자에게 개인 DM으로 알림 전송
 import { VENUE_LABELS } from '../utils/constants.js';
+import { logger } from '../middleware/logger.js';
 
 // 지연 초기화 — 서버 시작 시 크래시 방지, 첫 호출 시점에 환경변수 확인
 let _initialized = false;
@@ -14,10 +15,7 @@ function getTelegramConfig() {
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!token || !chatId) {
-      console.warn(
-        '[Telegram] TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID 환경변수가 설정되지 않았습니다. ' +
-        'Telegram 알림을 건너뜁니다.'
-      );
+      logger.warn('[Telegram] TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID 환경변수가 설정되지 않았습니다. Telegram 알림을 건너뜁니다.');
       return null;
     }
 
@@ -86,12 +84,12 @@ export async function sendEmailFailureAlert(reservation, errorMessage) {
 
     if (!response.ok) {
       const body = await response.text();
-      console.error('[Telegram] 알림 발송 실패 (HTTP', response.status, '):', body);
+      logger.error({ status: response.status, body }, '[Telegram] 알림 발송 실패');
     } else {
-      console.log('[Telegram] 이메일 실패 알림 발송 완료 (예약 id:', reservation.id, ')');
+      logger.info({ reservationId: reservation.id }, '[Telegram] 이메일 실패 알림 발송 완료');
     }
   } catch (err) {
     // Telegram 자체 장애가 서버에 영향을 주면 안 됨 — 로그만 남기고 종료
-    console.error('[Telegram] 알림 발송 중 예외 발생:', err.message);
+    logger.error({ err }, '[Telegram] 알림 발송 중 예외 발생');
   }
 }

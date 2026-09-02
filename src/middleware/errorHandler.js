@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 // Error types and messages
 const ERROR_TYPES = {
   ENTITY_TOO_LARGE: 'entity.too.large',
@@ -24,19 +26,7 @@ const HTTP_STATUS = {
 };
 
 export function errorHandler(err, req, res, next) {
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  // Log error with timestamp and request info
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [Error] ${err.name || 'Error'}: ${err.message}`;
-
-  if (isDev) {
-    console.error(logMessage);
-    console.error('[Stack]', err.stack);
-  } else {
-    // In production, log minimal info
-    console.error(logMessage);
-  }
+  logger.error({ err, method: req.method, url: req.url }, 'Unhandled error');
 
   // Handle specific error types
   if (err.type === ERROR_TYPES.ENTITY_TOO_LARGE) {

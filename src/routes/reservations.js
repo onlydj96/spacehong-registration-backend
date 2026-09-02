@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
 import { validateReservation } from '../middleware/validation.js';
 import { parseMinutes, calculatePrice } from '../utils/helpers.js';
+import { logger } from '../middleware/logger.js';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       .single();
 
     if (error) {
-      console.error('[Reservation Error]', error.code, error.message);
+      logger.error({ code: error.code, message: error.message }, '[Reservation Error]');
       return res.status(500).json({
         success: false,
         errors: [ERROR_MESSAGES.DB_INSERT_FAILED],

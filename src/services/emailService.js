@@ -1,6 +1,8 @@
 import { Resend } from 'resend';
 import { buildQuotePdf, buildContractPdf } from './pdfService.js';
 import { VENUE_LABELS } from '../utils/constants.js';
+import { OPTION_LABELS, formatKRW, formatDate } from '../utils/documentHelpers.js';
+import { logger } from '../middleware/logger.js';
 
 // 발신 주소·연락처 — 환경변수로 관리
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Space Hong <noreply@space-hong.com>';
@@ -16,27 +18,6 @@ function getResend() {
     _resend = new Resend(process.env.RESEND_API_KEY);
   }
   return _resend;
-}
-
-const OPTION_LABELS = {
-  opt_extra_capacity:    { label: '수용인원 50명 이상',        price: 100000 },
-  opt_multitrack:        { label: '멀티트랙 녹음',            price: 100000 },
-  opt_personal_monitor:  { label: '퍼스널 모니터 / 인이어',   price: 100000 },
-  opt_extra_operator:    { label: '추가 오퍼레이터',          price: null   },  // 시간당
-  opt_drum_cleanup:      { label: '무대 드럼 정리',           price: 100000 },
-  opt_bar_operation:     { label: '바 운영',                  price: 0      },
-  opt_prompter:          { label: '프롬프터',                 price: 0      },
-  opt_tax_invoice:       { label: '세금계산서 발행',          price: 0      },
-};
-
-function formatKRW(amount) {
-  return `${(amount / 10000).toLocaleString('ko-KR')}만원`;
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}요일)`;
 }
 
 function escapeHtml(str) {
@@ -212,10 +193,10 @@ export async function sendReservationConfirmEmail(reservation) {
   });
 
   if (error) {
-    console.error('[Email] 발송 실패:', error);
+    logger.error({ err: error }, '[Email] 발송 실패');
     throw error;
   }
 
-  console.log('[Email] 발송 완료:', data?.id, '→', reservation.email);
+  logger.info({ emailId: data?.id, to: reservation.email }, '[Email] 발송 완료');
   return data;
 }

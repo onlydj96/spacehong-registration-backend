@@ -23,6 +23,32 @@ const VALID_PERIODS = new Set(['weekly', 'monthly', 'yearly']);
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
+// Supabase PostgREST는 기본 max_rows=1000 제한이 있어 페이지네이션으로 전체 데이터 수집
+async function fetchAllPageViews(startDate, endDate, selectFields) {
+  const PAGE_SIZE = 1000;
+  let allData = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('page_views')
+      .select(selectFields)
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+      .order('created_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return allData;
+}
+
 // 이번 주 월요일 계산
 function getMondayOfWeek(date) {
   const d = new Date(date);
@@ -99,26 +125,11 @@ router.get('/', verifyAdmin, async (req, res, next) => {
       prevEndDate = new Date(paramYear - 1, 11, 31, 23, 59, 59);
     }
 
-    // 현재 기간 + 이전 기간 동시 조회
-    // 연간 조회 시 limit(10000)으로 잘릴 수 있어 period별로 limit 조정
-    const rowLimit = period === 'yearly' ? 100000 : 10000;
-    const [{ data: rawViews, error }, { data: prevRawViews }] = await Promise.all([
-      supabase
-        .from('page_views')
-        .select('session_id, page_path, page_name, step, created_at')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: true })
-        .limit(rowLimit),
-      supabase
-        .from('page_views')
-        .select('session_id')
-        .gte('created_at', prevStartDate.toISOString())
-        .lte('created_at', prevEndDate.toISOString())
-        .limit(rowLimit),
+    // 현재 기간 + 이전 기간 동시 조회 (페이지네이션으로 Supabase 1000행 제한 우회)
+    const [rawViews, prevRawViews] = await Promise.all([
+      fetchAllPageViews(startDate, endDate, 'session_id, page_path, page_name, step, created_at'),
+      fetchAllPageViews(prevStartDate, prevEndDate, 'session_id'),
     ]);
-
-    if (error) throw error;
 
     const views = rawViews || [];
 

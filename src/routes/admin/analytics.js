@@ -100,6 +100,8 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     }
 
     // 현재 기간 + 이전 기간 동시 조회
+    // 연간 조회 시 limit(10000)으로 잘릴 수 있어 period별로 limit 조정
+    const rowLimit = period === 'yearly' ? 100000 : 10000;
     const [{ data: rawViews, error }, { data: prevRawViews }] = await Promise.all([
       supabase
         .from('page_views')
@@ -107,13 +109,13 @@ router.get('/', verifyAdmin, async (req, res, next) => {
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: true })
-        .limit(10000),
+        .limit(rowLimit),
       supabase
         .from('page_views')
         .select('session_id')
         .gte('created_at', prevStartDate.toISOString())
         .lte('created_at', prevEndDate.toISOString())
-        .limit(10000),
+        .limit(rowLimit),
     ]);
 
     if (error) throw error;
@@ -141,9 +143,10 @@ router.get('/', verifyAdmin, async (req, res, next) => {
         });
 
       } else {
+        // UTC 기준으로 월 비교 (Supabase는 UTC 저장, getMonth()는 서버 로컬타임 기준이라 불일치 가능)
         periodViews = views.filter(v => {
           const d = new Date(v.created_at);
-          return d.getFullYear() === paramYear && d.getMonth() === index;
+          return d.getUTCFullYear() === paramYear && d.getUTCMonth() === index;
         });
       }
 

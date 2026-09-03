@@ -1,6 +1,9 @@
 /**
  * Admin Analytics Router
  * GET /api/admin/analytics - 페이지 방문 통계 조회
+ *
+ * 집계 계산은 모두 PostgreSQL 함수에서 처리합니다.
+ * SQL 함수 정의: supabase/analytics_functions.sql
  */
 import { Router } from 'express';
 import { supabase } from '../../services/supabase.js';
@@ -23,33 +26,6 @@ const VALID_PERIODS = new Set(['weekly', 'monthly', 'yearly']);
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
-// Supabase PostgREST는 기본 max_rows=1000 제한이 있어 페이지네이션으로 전체 데이터 수집
-async function fetchAllPageViews(startDate, endDate, selectFields) {
-  const PAGE_SIZE = 1000;
-  let allData = [];
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from('page_views')
-      .select(selectFields)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
-      .order('created_at', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-
-    allData = allData.concat(data);
-    if (data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-
-  return allData;
-}
-
-// 이번 주 월요일 계산
 function getMondayOfWeek(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -65,12 +41,11 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     const period = VALID_PERIODS.has(req.query.period) ? req.query.period : 'monthly';
     const now = new Date();
 
-    // 날짜 파라미터 파싱
     const paramYear = parseInt(req.query.year) || now.getFullYear();
     const paramMonth = parseInt(req.query.month) || (now.getMonth() + 1); // 1-12
     const paramWeekStart = req.query.weekStart; // YYYY-MM-DD
 
-    // 캐시 키: 기간 + 날짜 파라미터 포함
+    // 캐시 키
     let dateKey;
     if (period === 'weekly') dateKey = paramWeekStart || 'current';
     else if (period === 'monthly') dateKey = `${paramYear}-${String(paramMonth).padStart(2, '0')}`;
@@ -80,17 +55,16 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     const cached = getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    // 기간별 날짜 범위 및 레이블 계산
-    let startDate, endDate, labels, prevStartDate, prevEndDate;
+    // 날짜 범위 계산 (반개구간 [start, end) 사용)
+    let startDate, endDateExclusive, labels, prevStartDate, prevEndDateExclusive;
 
     if (period === 'weekly') {
-      // 선택한 주의 월요일 기준 7일
       const weekBase = paramWeekStart
         ? new Date(paramWeekStart + 'T00:00:00')
         : getMondayOfWeek(now);
       startDate = new Date(weekBase);
       startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      endDateExclusive = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       labels = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
@@ -98,139 +72,87 @@ router.get('/', verifyAdmin, async (req, res, next) => {
       });
 
       prevStartDate = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-      prevEndDate = new Date(startDate);
+      prevEndDateExclusive = new Date(startDate);
 
     } else if (period === 'monthly') {
-      // 선택한 달의 일별 분석
-      const targetYear = paramYear;
       const targetMonth = paramMonth - 1; // 0-indexed
-      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-      startDate = new Date(targetYear, targetMonth, 1, 0, 0, 0);
-      endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+      const daysInMonth = new Date(paramYear, targetMonth + 1, 0).getDate();
+      startDate = new Date(paramYear, targetMonth, 1, 0, 0, 0);
+      endDateExclusive = new Date(paramYear, targetMonth + 1, 1, 0, 0, 0);
 
       labels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`);
 
-      // 이전 달
-      prevStartDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0);
-      prevEndDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
+      prevStartDate = new Date(paramYear, targetMonth - 1, 1, 0, 0, 0);
+      prevEndDateExclusive = new Date(paramYear, targetMonth, 1, 0, 0, 0);
 
-    } else {
-      // yearly: 선택한 연도의 월별 분석
+    } else { // yearly
       startDate = new Date(paramYear, 0, 1, 0, 0, 0);
-      endDate = new Date(paramYear, 11, 31, 23, 59, 59);
+      endDateExclusive = new Date(paramYear + 1, 0, 1, 0, 0, 0);
       labels = MONTH_LABELS;
 
-      // 이전 연도
       prevStartDate = new Date(paramYear - 1, 0, 1, 0, 0, 0);
-      prevEndDate = new Date(paramYear - 1, 11, 31, 23, 59, 59);
+      prevEndDateExclusive = new Date(paramYear, 0, 1, 0, 0, 0);
     }
 
-    // 현재 기간 + 이전 기간 동시 조회 (페이지네이션으로 Supabase 1000행 제한 우회)
-    const [rawViews, prevRawViews] = await Promise.all([
-      fetchAllPageViews(startDate, endDate, 'session_id, page_path, page_name, step, created_at'),
-      fetchAllPageViews(prevStartDate, prevEndDate, 'session_id'),
+    const p_start = startDate.toISOString();
+    const p_end = endDateExclusive.toISOString();
+    const p_prev_start = prevStartDate.toISOString();
+    const p_prev_end = prevEndDateExclusive.toISOString();
+
+    // 4개 PostgreSQL 집계 함수 병렬 호출
+    const [periodResult, pageDistResult, funnelResult, summaryResult] = await Promise.all([
+      supabase.rpc('analytics_visits_by_period', { p_start, p_end, p_period: period }),
+      supabase.rpc('analytics_page_distribution', { p_start, p_end }),
+      supabase.rpc('analytics_rental_funnel', { p_start, p_end }),
+      supabase.rpc('analytics_conversion_summary', { p_start, p_end, p_prev_start, p_prev_end }),
     ]);
 
-    const views = rawViews || [];
+    for (const { error } of [periodResult, pageDistResult, funnelResult, summaryResult]) {
+      if (error) throw error;
+    }
 
-    // 1. visitsByPeriod: 기간 단위별 방문자(unique session) 수 및 페이지뷰 수
-    const visitsByPeriod = labels.map((label, index) => {
-      let periodViews;
+    const periodRows = periodResult.data ?? [];
+    const pageDistRows = pageDistResult.data ?? [];
+    const funnelRows = funnelResult.data ?? [];
+    const summaryRow = summaryResult.data?.[0] ?? {};
 
-      if (period === 'weekly') {
-        const dayStart = new Date(startDate.getTime() + index * 24 * 60 * 60 * 1000);
-        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-        periodViews = views.filter(v => {
-          const d = new Date(v.created_at);
-          return d >= dayStart && d < dayEnd;
-        });
-
-      } else if (period === 'monthly') {
-        const dayStart = new Date(paramYear, paramMonth - 1, index + 1, 0, 0, 0);
-        const dayEnd = new Date(paramYear, paramMonth - 1, index + 2, 0, 0, 0);
-        periodViews = views.filter(v => {
-          const d = new Date(v.created_at);
-          return d >= dayStart && d < dayEnd;
-        });
-
-      } else {
-        // UTC 기준으로 월 비교 (Supabase는 UTC 저장, getMonth()는 서버 로컬타임 기준이라 불일치 가능)
-        periodViews = views.filter(v => {
-          const d = new Date(v.created_at);
-          return d.getUTCFullYear() === paramYear && d.getUTCMonth() === index;
-        });
-      }
-
-      const uniqueVisitors = new Set(periodViews.map(v => v.session_id)).size;
+    // visitsByPeriod: DB에 없는 bucket(방문 0)은 0으로 채움
+    const periodMap = new Map(periodRows.map(r => [r.bucket_index, r]));
+    const visitsByPeriod = labels.map((label, i) => {
+      const row = periodMap.get(i);
       return {
         label,
-        visitors: uniqueVisitors,
-        pageViews: periodViews.length,
+        visitors: Number(row?.visitors ?? 0),
+        pageViews: Number(row?.page_views ?? 0),
       };
     });
 
-    // 2. pageDistribution: 페이지별 방문 건수 집계
-    const pathCounts = {};
-    const pathNames = {};
-    for (const v of views) {
-      if (v.page_path === '/rental' && v.step !== 0) continue;
-      pathCounts[v.page_path] = (pathCounts[v.page_path] || 0) + 1;
-      if (!pathNames[v.page_path]) pathNames[v.page_path] = v.page_name;
-    }
-    const pageDistribution = Object.entries(pathCounts)
-      .map(([pagePath, count]) => ({
-        pagePath,
-        pageName: pathNames[pagePath] || pagePath,
-        count,
-      }))
-      .sort((a, b) => b.count - a.count);
+    // pageDistribution: DB에서 이미 count DESC 정렬됨
+    const pageDistribution = pageDistRows.map(r => ({
+      pagePath: r.page_path,
+      pageName: r.page_name,
+      count: Number(r.count),
+    }));
 
-    // 3. rentalFunnel: 대관 폼 단계별 도달 세션 수
-    const rentalViews = views.filter(v => v.page_path === '/rental' && v.step !== null);
-    const rentalFunnel = Array.from({ length: 7 }, (_, step) => {
-      const stepSessions = new Set(
-        rentalViews.filter(v => v.step === step).map(v => v.session_id)
-      );
-      return {
-        step,
-        stepName: RENTAL_STEP_NAMES[step],
-        sessions: stepSessions.size,
-      };
-    });
+    // rentalFunnel: DB에 없는 step(방문 0)은 0으로 채움
+    const funnelMap = new Map(funnelRows.map(r => [r.step, r]));
+    const rentalFunnel = Array.from({ length: 7 }, (_, step) => ({
+      step,
+      stepName: RENTAL_STEP_NAMES[step],
+      sessions: Number(funnelMap.get(step)?.sessions ?? 0),
+    }));
 
-    // 4. conversionSummary: 전환율 + 추가 지표
-    const totalVisitors = new Set(views.map(v => v.session_id)).size;
-    const totalPageViews = views.length;
-
-    // 세션별 페이지뷰 수 집계 (bounce rate 계산용)
-    const sessionPageCounts = {};
-    for (const v of views) {
-      sessionPageCounts[v.session_id] = (sessionPageCounts[v.session_id] || 0) + 1;
-    }
-    const singlePageSessions = Object.values(sessionPageCounts).filter(c => c === 1).length;
-    const bounceRate = totalVisitors > 0
-      ? Math.round((singlePageSessions / totalVisitors) * 100)
-      : 0;
-    const pagesPerVisit = totalVisitors > 0
-      ? Math.round((totalPageViews / totalVisitors) * 10) / 10
-      : 0;
-
-    const rentalStep0Sessions = new Set(
-      rentalViews.filter(v => v.step === 0).map(v => v.session_id)
-    ).size;
-    const rentalStep6Sessions = new Set(
-      rentalViews.filter(v => v.step === 6).map(v => v.session_id)
-    ).size;
-
-    const completionRate = rentalStep0Sessions > 0
-      ? Math.round((rentalStep6Sessions / rentalStep0Sessions) * 1000) / 10
-      : 0;
-    const overallConversionRate = totalVisitors > 0
-      ? Math.round((rentalStep6Sessions / totalVisitors) * 1000) / 10
-      : 0;
-
-    // 이전 기간 방문자 수 (비교용)
-    const previousPeriodVisitors = new Set((prevRawViews || []).map(v => v.session_id)).size;
+    const conversionSummary = {
+      totalVisitors: Number(summaryRow.total_visitors ?? 0),
+      totalPageViews: Number(summaryRow.total_page_views ?? 0),
+      pagesPerVisit: Number(summaryRow.pages_per_visit ?? 0),
+      bounceRate: Number(summaryRow.bounce_rate ?? 0),
+      previousPeriodVisitors: Number(summaryRow.previous_period_visitors ?? 0),
+      rentalStarters: Number(summaryRow.rental_starters ?? 0),
+      rentalCompleters: Number(summaryRow.rental_completers ?? 0),
+      completionRate: Number(summaryRow.completion_rate ?? 0),
+      overallConversionRate: Number(summaryRow.overall_conversion_rate ?? 0),
+    };
 
     const response = {
       success: true,
@@ -238,22 +160,12 @@ router.get('/', verifyAdmin, async (req, res, next) => {
         visitsByPeriod,
         pageDistribution,
         rentalFunnel,
-        conversionSummary: {
-          totalVisitors,
-          totalPageViews,
-          pagesPerVisit,
-          bounceRate,
-          previousPeriodVisitors,
-          rentalStarters: rentalStep0Sessions,
-          rentalCompleters: rentalStep6Sessions,
-          completionRate,
-          overallConversionRate,
-        },
+        conversionSummary,
         meta: {
           period,
           dateKey,
           startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          endDate: endDateExclusive.toISOString(),
         },
       },
     };

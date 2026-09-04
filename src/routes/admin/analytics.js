@@ -25,6 +25,12 @@ const RENTAL_STEP_NAMES = {
 const VALID_PERIODS = new Set(['weekly', 'monthly', 'yearly']);
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // UTC+9
+
+// 날짜 컴포넌트(년/월/일)를 KST 자정 UTC로 변환
+function kstMidnight(year, month, day) {
+  return new Date(Date.UTC(year, month, day) - KST_OFFSET_MS);
+}
 
 function getMondayOfWeek(date) {
   const d = new Date(date);
@@ -62,13 +68,14 @@ router.get('/', verifyAdmin, async (req, res, next) => {
       const weekBase = paramWeekStart
         ? new Date(paramWeekStart + 'T00:00:00')
         : getMondayOfWeek(now);
-      startDate = new Date(weekBase);
-      startDate.setHours(0, 0, 0, 0);
+      // weekBase의 날짜 컴포넌트를 KST 자정 UTC로 변환
+      startDate = kstMidnight(weekBase.getFullYear(), weekBase.getMonth(), weekBase.getDate());
       endDateExclusive = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       labels = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
-        return `${DAY_LABELS[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+        // KST 날짜 기준으로 레이블 생성
+        const kstDate = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000 + KST_OFFSET_MS);
+        return `${DAY_LABELS[kstDate.getUTCDay()]} ${kstDate.getUTCMonth() + 1}/${kstDate.getUTCDate()}`;
       });
 
       prevStartDate = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -77,21 +84,21 @@ router.get('/', verifyAdmin, async (req, res, next) => {
     } else if (period === 'monthly') {
       const targetMonth = paramMonth - 1; // 0-indexed
       const daysInMonth = new Date(paramYear, targetMonth + 1, 0).getDate();
-      startDate = new Date(paramYear, targetMonth, 1, 0, 0, 0);
-      endDateExclusive = new Date(paramYear, targetMonth + 1, 1, 0, 0, 0);
+      startDate = kstMidnight(paramYear, targetMonth, 1);
+      endDateExclusive = kstMidnight(paramYear, targetMonth + 1, 1);
 
       labels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}일`);
 
-      prevStartDate = new Date(paramYear, targetMonth - 1, 1, 0, 0, 0);
-      prevEndDateExclusive = new Date(paramYear, targetMonth, 1, 0, 0, 0);
+      prevStartDate = kstMidnight(paramYear, targetMonth - 1, 1);
+      prevEndDateExclusive = kstMidnight(paramYear, targetMonth, 1);
 
     } else { // yearly
-      startDate = new Date(paramYear, 0, 1, 0, 0, 0);
-      endDateExclusive = new Date(paramYear + 1, 0, 1, 0, 0, 0);
+      startDate = kstMidnight(paramYear, 0, 1);
+      endDateExclusive = kstMidnight(paramYear + 1, 0, 1);
       labels = MONTH_LABELS;
 
-      prevStartDate = new Date(paramYear - 1, 0, 1, 0, 0, 0);
-      prevEndDateExclusive = new Date(paramYear, 0, 1, 0, 0, 0);
+      prevStartDate = kstMidnight(paramYear - 1, 0, 1);
+      prevEndDateExclusive = kstMidnight(paramYear, 0, 1);
     }
 
     const p_start = startDate.toISOString();

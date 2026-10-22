@@ -3,6 +3,7 @@
  * 예약 관리 관련 라우트
  */
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { supabase } from '../../services/supabase.js';
 import { deleteCached, CACHE_KEYS } from '../../utils/cache.js';
 import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } from './utils.js';
@@ -12,6 +13,36 @@ import { logger } from '../../middleware/logger.js';
 import { buildContractPdf } from '../../services/pdfService.js';
 
 const router = Router();
+
+// 일회용 PDF 다운로드 토큰 저장소 (메모리, 5분 TTL)
+const pdfTokens = new Map();
+
+function createPdfToken(id) {
+  const token = randomUUID();
+  const timer = setTimeout(() => pdfTokens.delete(token), 5 * 60 * 1000);
+  pdfTokens.set(token, { id, timer });
+  return token;
+}
+
+function consumePdfToken(token, id) {
+  const entry = pdfTokens.get(token);
+  if (!entry || entry.id !== id) return false;
+  clearTimeout(entry.timer);
+  pdfTokens.delete(token);
+  return true;
+}
+
+// PDF 다운로드 인증: 일회용 토큰 또는 관리자 세션
+function pdfAuth(req, res, next) {
+  const { token } = req.query;
+  if (token) {
+    if (!consumePdfToken(token, req.params.id)) {
+      return res.status(401).json({ success: false, errors: ['유효하지 않거나 만료된 토큰입니다.'] });
+    }
+    return next();
+  }
+  return verifyAdmin(req, res, next);
+}
 
 // GET /reservations - Get all reservations with search
 router.get('/', verifyAdmin, async (req, res, next) => {
@@ -117,8 +148,14 @@ router.get('/:id', verifyAdmin, validateId, async (req, res, next) => {
   }
 });
 
+// POST /reservations/:id/contract-token - 일회용 PDF 다운로드 토큰 발급
+router.post('/:id/contract-token', verifyAdmin, validateId, (req, res) => {
+  const token = createPdfToken(req.params.id);
+  res.json({ success: true, token });
+});
+
 // GET /reservations/:id/contract.pdf - Download contract PDF
-router.get('/:id/contract.pdf', verifyAdmin, validateId, async (req, res, next) => {
+router.get('/:id/contract.pdf', pdfAuth, validateId, async (req, res, next) => {
   try {
     const { id } = req.params;
 

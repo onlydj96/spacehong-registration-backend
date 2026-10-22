@@ -9,6 +9,7 @@ import { verifyAdmin, getPaginationParams, sanitizeSearchTerm , validateId } fro
 import { sendReservationConfirmEmail } from '../../services/emailService.js';
 import { sendEmailFailureAlert } from '../../services/telegramService.js';
 import { logger } from '../../middleware/logger.js';
+import { buildContractPdf } from '../../services/pdfService.js';
 
 const router = Router();
 
@@ -111,6 +112,41 @@ router.get('/:id', verifyAdmin, validateId, async (req, res, next) => {
     }
 
     res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /reservations/:id/contract.pdf - Download contract PDF
+router.get('/:id/contract.pdf', verifyAdmin, validateId, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+      .from('reservations')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ success: false, errors: ['예약을 찾을 수 없습니다.'] });
+    }
+
+    const pdfBuffer = await buildContractPdf(data);
+
+    const safeName = (data.name || '계약서').replace(/[^\w가-힣]/g, '_');
+    const filename = `계약서_${safeName}.pdf`;
+    const encodedFilename = encodeURIComponent(filename);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+    );
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
   } catch (err) {
     next(err);
   }

@@ -6,7 +6,7 @@ import { OPTION_LABELS, formatKRW, formatDate } from '../utils/documentHelpers.j
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Operator.Spacehong@gmail.com';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'spacehongCS@gmail.com';
 const FONT_REGULAR = path.join(__dirname, '../assets/fonts/NotoSansKR-Regular.otf');
 const FONT_BOLD    = path.join(__dirname, '../assets/fonts/NotoSansKR-Bold.otf');
 

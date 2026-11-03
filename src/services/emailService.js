@@ -6,7 +6,7 @@ import { logger } from '../middleware/logger.js';
 
 // 발신 주소·연락처 — 환경변수로 관리
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Space Hong <noreply@space-hong.com>';
-const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Operator.Spacehong@gmail.com';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'spacehongCS@gmail.com';
 
 // Lazy initialization — 실제 발송 시점에 키 확인 (서버 시작 시 크래시 방지)
 let _resend = null;

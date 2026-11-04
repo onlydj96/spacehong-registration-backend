@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase.js';
 import { logger } from '../middleware/logger.js';
+import { ALLOWED_ORIGINS } from '../utils/constants.js';
 
 const router = Router();
 
@@ -12,16 +13,29 @@ const ALLOWED_PATHS = new Set([
 ]);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ALLOWED_ORIGIN_SET = new Set(ALLOWED_ORIGINS);
 
 // POST /api/analytics/pageview - 페이지 방문 기록
 // 인증 불필요 — 공개 엔드포인트. UX에 영향을 주지 않도록 항상 success 반환.
 router.post('/pageview', async (req, res) => {
   try {
-    const { sessionId, pagePath, pageName, step } = req.body;
+    // Origin 검증: 브라우저는 fetch POST에 항상 Origin을 보냄.
+    // Origin이 없거나 허용 목록 밖이면(스크립트/외부 사이트) 조용히 무시 — 집계 부풀리기 방지
+    const origin = req.headers.origin;
+    if (!origin || !ALLOWED_ORIGIN_SET.has(origin)) {
+      return res.json({ success: true });
+    }
+
+    const { sessionId, visitorId, pagePath, pageName, step } = req.body;
 
     // sessionId 검증 (UUID 형식)
     if (!sessionId || !UUID_REGEX.test(sessionId)) {
       return res.status(400).json({ success: false, errors: ['유효하지 않은 세션 ID입니다.'] });
+    }
+
+    // visitorId 검증 (선택 — 구버전 클라이언트는 미전송)
+    if (visitorId !== undefined && visitorId !== null && !UUID_REGEX.test(visitorId)) {
+      return res.status(400).json({ success: false, errors: ['유효하지 않은 방문자 ID입니다.'] });
     }
 
     // pagePath 화이트리스트 검증
@@ -51,6 +65,7 @@ router.post('/pageview', async (req, res) => {
       .from('page_views')
       .insert({
         session_id: sessionId,
+        visitor_id: visitorId || null,
         page_path: pagePath,
         page_name: pageName.trim(),
         step: validatedStep,

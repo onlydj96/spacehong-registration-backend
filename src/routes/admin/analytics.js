@@ -130,6 +130,7 @@ router.get('/', verifyAdmin, async (req, res, next) => {
       return {
         label,
         visitors: Number(row?.visitors ?? 0),
+        visits: Number(row?.visits ?? 0),
         pageViews: Number(row?.page_views ?? 0),
       };
     });
@@ -141,17 +142,20 @@ router.get('/', verifyAdmin, async (req, res, next) => {
       count: Number(r.count),
     }));
 
-    // rentalFunnel: DB에 없는 step(방문 0)은 0으로 채움
+    // rentalFunnel: DB에 없는 step(방문 0)은 0으로 채움 — 순 방문자 기준
     const funnelMap = new Map(funnelRows.map(r => [r.step, r]));
     const rentalFunnel = Array.from({ length: 7 }, (_, step) => ({
       step,
       stepName: RENTAL_STEP_NAMES[step],
-      sessions: Number(funnelMap.get(step)?.sessions ?? 0),
+      visitors: Number(funnelMap.get(step)?.visitors ?? 0),
     }));
 
     const conversionSummary = {
       totalVisitors: Number(summaryRow.total_visitors ?? 0),
+      totalVisits: Number(summaryRow.total_visits ?? 0),
       totalPageViews: Number(summaryRow.total_page_views ?? 0),
+      newVisitors: Number(summaryRow.new_visitors ?? 0),
+      returningVisitors: Number(summaryRow.returning_visitors ?? 0),
       pagesPerVisit: Number(summaryRow.pages_per_visit ?? 0),
       bounceRate: Number(summaryRow.bounce_rate ?? 0),
       previousPeriodVisitors: Number(summaryRow.previous_period_visitors ?? 0),

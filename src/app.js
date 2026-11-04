@@ -12,6 +12,7 @@ import adminRouter from './routes/admin/index.js';
 import testimonialsRouter from './routes/testimonials.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/logger.js';
+import { ALLOWED_ORIGINS } from './utils/constants.js';
 
 const app = express();
 
@@ -22,12 +23,8 @@ app.use(helmet());
 app.use(compression());
 app.use(requestLogger);
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
-  .split(',')
-  .map(o => o.trim());
-
 app.use(cors({
-  origin: allowedOrigins,
+  origin: ALLOWED_ORIGINS,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
   credentials: true,
 }));

@@ -1,4 +1,4 @@
-import { parseMinutes, TIME_CONSTANTS } from '../utils/helpers.js';
+import { parseMinutes, TIME_CONSTANTS, getMinRentalHours } from '../utils/helpers.js';
 
 const PHONE_REGEX = /^01[016789]\d{7,8}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -158,8 +158,9 @@ export function validateReservation(req, res, next) {
       errors.push('종료 시간은 시작 시간보다 늦어야 합니다.');
     } else {
       const hours = (endMin - startMin) / 60;
-      if (hours < TIME_CONSTANTS.MIN_RENTAL_HOURS) {
-        errors.push(`대관시간은 최소 ${TIME_CONSTANTS.MIN_RENTAL_HOURS}시간 이상이어야 합니다.`);
+      const minHours = getMinRentalHours(venueType, rentalDate);
+      if (hours < minHours) {
+        errors.push(`대관시간은 최소 ${minHours}시간 이상이어야 합니다.`);
       } else if (hours > TIME_CONSTANTS.MAX_RENTAL_HOURS) {
         errors.push(`대관시간은 최대 ${TIME_CONSTANTS.MAX_RENTAL_HOURS}시간을 초과할 수 없습니다.`);
       }

@@ -14,6 +14,30 @@ export const TIME_CONSTANTS = {
   MAX_RENTAL_HOURS: 12,
 };
 
+// 최소 대관 시간 — 프론트 rentalPricing.js(RATE_SEASONS)와 같은 값을 유지해야 함
+const PEAK_MONTHS = [10, 11, 12];
+const MIN_HOURS_BY_VENUE = { performance: 5, event: 5, studio: 4 };
+const PEAK_WEEKEND_MIN_HOURS = 7;
+
+/**
+ * 대관 유형·날짜별 최소 대관 시간
+ * - 공연·행사 5시간, 촬영(studio) 4시간
+ * - 성수기(10~12월) 금~일은 7시간
+ * @param {string} venueType - performance | event | studio
+ * @param {string} rentalDate - YYYY-MM-DD
+ * @returns {number}
+ */
+export function getMinRentalHours(venueType, rentalDate) {
+  const base = MIN_HOURS_BY_VENUE[venueType] ?? TIME_CONSTANTS.MIN_RENTAL_HOURS;
+  const match = typeof rentalDate === 'string' && rentalDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return base;
+  const [, y, m, d] = match.map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=일, 5=금, 6=토
+  const isFriToSun = day === 5 || day === 6 || day === 0;
+  if (PEAK_MONTHS.includes(m) && isFriToSun) return Math.max(base, PEAK_WEEKEND_MIN_HOURS);
+  return base;
+}
+
 // Validation patterns
 export const VALIDATION_PATTERNS = {
   PHONE: /^01[016789]\d{7,8}$/,

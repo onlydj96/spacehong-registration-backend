@@ -3,6 +3,7 @@ export const OPTION_PRICES = {
   extraCapacity: 100000,
   multitrack: 100000,
   personalMonitor: 100000,
+  keyboard: 70000,
   extraOperator: 20000,  // per hour
   drumCleanup: 100000,
 };
@@ -84,6 +85,7 @@ export function calculatePrice(options) {
   if (options.multitrack) total += OPTION_PRICES.multitrack;
   if (options.personalMonitor) total += OPTION_PRICES.personalMonitor;
   if (options.drumCleanup) total += OPTION_PRICES.drumCleanup;
+  if (options.keyboard) total += OPTION_PRICES.keyboard;
   if (options.extraOperator) {
     const hours = Math.max(0, parseInt(options.extraOperatorHours, 10) || 0);
     total += OPTION_PRICES.extraOperator * hours;

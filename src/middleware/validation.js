@@ -201,7 +201,7 @@ export function validateReservation(req, res, next) {
   }
 
   if (options && typeof options === 'object') {
-    const boolFields = ['extraCapacity', 'multitrack', 'personalMonitor', 'extraOperator', 'barOperation', 'prompter', 'drumCleanup', 'taxInvoice'];
+    const boolFields = ['extraCapacity', 'multitrack', 'personalMonitor', 'keyboard', 'extraOperator', 'barOperation', 'prompter', 'drumCleanup', 'taxInvoice'];
     for (const field of boolFields) {
       if (options[field] !== undefined && typeof options[field] !== 'boolean') {
         errors.push(`옵션 "${field}"는 true/false 값이어야 합니다.`);

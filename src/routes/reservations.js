@@ -46,6 +46,7 @@ router.post('/', validateReservation, async (req, res, next) => {
       opt_extra_capacity: options?.extraCapacity || false,
       opt_multitrack: options?.multitrack || false,
       opt_personal_monitor: options?.personalMonitor || false,
+      opt_keyboard: options?.keyboard || false,
       opt_extra_operator: options?.extraOperator || false,
       opt_extra_operator_hours: options?.extraOperatorHours || 0,
       opt_bar_operation: options?.barOperation || false,

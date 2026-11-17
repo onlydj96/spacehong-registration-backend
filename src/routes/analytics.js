@@ -5,11 +5,11 @@ import { ALLOWED_ORIGINS } from '../utils/constants.js';
 
 const router = Router();
 
-// 추적 허용 경로 화이트리스트 — App.jsx 라우트와 동기화 유지
+// 추적 허용 경로 화이트리스트 — 프론트엔드 App.jsx 라우트 · usePageTracking.js TRACKED_PAGES와 동기화 유지
 const ALLOWED_PATHS = new Set([
   '/', '/rental', '/site-visit', '/settlement',
-  '/about', '/space', '/facility', '/quote', '/tour',
-  '/faq', '/contact', '/info',
+  '/about', '/performance', '/event', '/filming', '/equipment', '/bar', '/pricing', '/contact',
+  '/space', '/facility', '/quote', '/tour', '/faq', '/info',
 ]);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

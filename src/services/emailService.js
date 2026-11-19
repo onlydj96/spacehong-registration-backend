@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
-import { buildQuotePdf, buildContractPdf } from './pdfService.js';
+import { buildContractPdf } from './pdfService.js';
 import { VENUE_LABELS } from '../utils/constants.js';
-import { OPTION_LABELS, formatKRW, formatDate } from '../utils/documentHelpers.js';
+import { formatDate } from '../utils/documentHelpers.js';
 import { logger } from '../middleware/logger.js';
 
 // 발신 주소·연락처 — 환경변수로 관리
@@ -30,33 +30,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-function buildOptionsHtml(reservation) {
-  const rows = [];
-
-  for (const [key, meta] of Object.entries(OPTION_LABELS)) {
-    if (!reservation[key]) continue;
-
-    let priceText = '';
-    if (key === 'opt_extra_operator' && reservation.opt_extra_operator_hours) {
-      const fee = 20000 * reservation.opt_extra_operator_hours;
-      priceText = `+${formatKRW(fee)} (${reservation.opt_extra_operator_hours}시간)`;
-    } else if (meta.price > 0) {
-      priceText = `+${formatKRW(meta.price)}`;
-    } else {
-      priceText = '포함';
-    }
-
-    rows.push(`
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;color:#444;">${meta.label}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;color:#222;font-weight:500;">${priceText}</td>
-      </tr>`);
-  }
-
-  if (rows.length === 0) return '<tr><td colspan="2" style="padding:8px 12px;color:#888;">선택된 추가 옵션 없음</td></tr>';
-  return rows.join('');
-}
-
 function buildEmailHtml(reservation) {
   const venueName = VENUE_LABELS[reservation.venue_type] || escapeHtml(reservation.venue_type);
   const name = escapeHtml(reservation.name);
@@ -65,7 +38,6 @@ function buildEmailHtml(reservation) {
   const startTime = escapeHtml(reservation.start_time);
   const endTime = escapeHtml(reservation.end_time);
   const rentalHours = escapeHtml(reservation.rental_hours);
-  const additionalPrice = reservation.additional_price || 0;
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -84,7 +56,7 @@ function buildEmailHtml(reservation) {
       <h2 style="margin:0 0 8px;font-size:18px;color:#111;">안녕하세요, ${name}님</h2>
       <p style="margin:0;color:#555;font-size:14px;line-height:1.7;">
         스페이스홍 <strong>${venueName}</strong> 예약이 확정되었습니다.<br>
-        아래에서 예약 정보 및 견적 내역을 확인해주세요.
+        아래에서 예약 정보를 확인해주세요.
       </p>
     </div>
 
@@ -115,24 +87,6 @@ function buildEmailHtml(reservation) {
       </table>
     </div>
 
-    <!-- 견적 내역 -->
-    <div style="padding:24px 40px 0;">
-      <h3 style="margin:0 0 12px;font-size:14px;color:#888;text-transform:uppercase;letter-spacing:1px;">견적 내역</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:14px;">
-        ${buildOptionsHtml(reservation)}
-        <tr style="background:#f9f9f9;">
-          <td style="padding:12px;color:#888;font-size:12px;" colspan="2">
-            * 기본 대관료는 예약 일정 및 테크라이더 확인 후 최종 안내됩니다.
-          </td>
-        </tr>
-        ${additionalPrice > 0 ? `
-        <tr style="border-top:2px solid #111;">
-          <td style="padding:12px;font-weight:700;font-size:15px;color:#111;">추가 옵션 합계</td>
-          <td style="padding:12px;font-weight:700;font-size:15px;color:#111;text-align:right;">${formatKRW(additionalPrice)}</td>
-        </tr>` : ''}
-      </table>
-    </div>
-
     <!-- 계약 주요 조항 -->
     <div style="padding:24px 40px 0;">
       <h3 style="margin:0 0 12px;font-size:14px;color:#888;text-transform:uppercase;letter-spacing:1px;">계약 주요 사항</h3>
@@ -146,7 +100,13 @@ function buildEmailHtml(reservation) {
         <p style="margin:0 0 8px;"><strong style="color:#111;">청소보증금</strong></p>
         <p style="margin:0 0 12px;">청소보증금 10만원을 대관료와 함께 선입금하며, 대관 종료 후 현장 확인을 거쳐 영업일 기준 3일 이내 환급됩니다.</p>
         <p style="margin:0 0 8px;"><strong style="color:#111;">첨부 파일 안내</strong></p>
-        <p style="margin:0;">본 메일에 견적내역서와 이용규정 계약서가 첨부되어 있습니다. 확인 후 보관해주세요.</p>
+        <p style="margin:0 0 12px;">본 메일에 이용규정 계약서가 첨부되어 있습니다. 확인 후 보관해주세요.</p>
+        <p style="margin:0 0 8px;"><strong style="color:#111;">테크라이더 및 큐시트 제출 안내</strong></p>
+        <p style="margin:0;">
+          본 메일에 첨부된 테크라이더와 큐시트는 작성에 도움을 드리기 위한 참고용 레퍼런스 파일입니다.<br>
+          첨부 자료를 참고하여 행사에 맞는 테크라이더와 큐시트를 작성하신 후, <strong style="color:#111;">대관일 최소 7일 전까지</strong> 회신해 주시기 바랍니다.<br>
+          원활한 사전 준비와 현장 운영을 위해 기한 내 전달 부탁드립니다.
+        </p>
       </div>
     </div>
 
@@ -174,10 +134,7 @@ export async function sendReservationConfirmEmail(reservation) {
 
   const venueName = VENUE_LABELS[reservation.venue_type] || reservation.venue_type;
 
-  const [quotePdf, contractPdf] = await Promise.all([
-    buildQuotePdf(reservation),
-    buildContractPdf(reservation),
-  ]);
+  const contractPdf = await buildContractPdf(reservation);
 
   const safeName = reservation.name.replace(/[^가-힣a-zA-Z0-9]/g, '_');
 
@@ -187,8 +144,7 @@ export async function sendReservationConfirmEmail(reservation) {
     subject: `[스페이스홍] ${venueName} 예약이 확정되었습니다`,
     html: buildEmailHtml(reservation),
     attachments: [
-      { filename: `견적내역서_${safeName}.pdf`,      content: quotePdf },
-      { filename: `이용규정_계약서_${safeName}.pdf`,  content: contractPdf },
+      { filename: `이용규정_계약서_${safeName}.pdf`, content: contractPdf },
     ],
   });
 

@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { buildContractPdf } from './pdfService.js';
 import { VENUE_LABELS } from '../utils/constants.js';
 import { formatDate } from '../utils/documentHelpers.js';
+import { REFUND_POLICY_TIMING_LABEL, REFUND_POLICY_SEASONS, REFUND_POLICY_ROWS } from '../utils/refundPolicy.js';
 import { logger } from '../middleware/logger.js';
 
 // 발신 주소·연락처 — 환경변수로 관리
@@ -28,6 +29,23 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/** 취소 접수 시점 × 일반기/성수기 환불 비율 표 (utils/refundPolicy.js) */
+function buildRefundTableHtml() {
+  const cell = 'padding:6px 8px;border-bottom:1px solid #e5e5e5;';
+  const headCells = REFUND_POLICY_SEASONS.map((s) =>
+    `<th style="${cell}text-align:right;color:#111;font-weight:600;">${s.label}<br><span style="font-weight:400;color:#888;">(${s.period})</span></th>`
+  ).join('');
+  const bodyRows = REFUND_POLICY_ROWS.map((row) =>
+    `<tr><td style="${cell}text-align:left;">${row.timing}</td>${
+      REFUND_POLICY_SEASONS.map((s) => `<td style="${cell}text-align:right;">${row[s.id]}%</td>`).join('')
+    }</tr>`
+  ).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;line-height:1.5;margin:0 0 8px;">
+          <tr><th style="${cell}text-align:left;color:#111;font-weight:600;vertical-align:bottom;">${REFUND_POLICY_TIMING_LABEL}</th>${headCells}</tr>
+          ${bodyRows}
+        </table>`;
 }
 
 function buildEmailHtml(reservation) {
@@ -92,11 +110,9 @@ function buildEmailHtml(reservation) {
       <h3 style="margin:0 0 12px;font-size:14px;color:#888;text-transform:uppercase;letter-spacing:1px;">계약 주요 사항</h3>
       <div style="background:#fafafa;border-radius:8px;padding:16px 20px;font-size:13px;color:#555;line-height:1.8;">
         <p style="margin:0 0 8px;"><strong style="color:#111;">취소 및 환불 정책</strong></p>
-        <ul style="margin:0 0 12px;padding-left:18px;">
-          <li>대관일 기준 45일 전: 전액 환불</li>
-          <li>대관일 기준 45일 이후: 원칙적으로 환불 불가</li>
-          <li>9~12월 성수기: 예약 확정 후 취소·변경·환불 불가</li>
-        </ul>
+        <p style="margin:0 0 4px;">대관자 사유로 취소하시는 경우, 대관일 기준 취소 접수 시점에 따라 아래 비율로 환불됩니다.</p>
+        ${buildRefundTableHtml()}
+        <p style="margin:0 0 12px;font-size:12px;color:#888;">※ 일반기·성수기는 대관일이 속한 월을 기준으로 합니다. 자세한 기준은 첨부된 이용규정 계약서 제2조를 확인해주세요.</p>
         <p style="margin:0 0 8px;"><strong style="color:#111;">청소보증금</strong></p>
         <p style="margin:0 0 12px;">청소보증금 10만원을 대관료와 함께 선입금하며, 대관 종료 후 현장 확인을 거쳐 영업일 기준 3일 이내 환급됩니다.</p>
         <p style="margin:0 0 8px;"><strong style="color:#111;">첨부 파일 안내</strong></p>

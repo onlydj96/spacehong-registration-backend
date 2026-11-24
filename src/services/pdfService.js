@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { VENUE_LABELS } from '../utils/constants.js';
 import { OPTION_LABELS, formatKRW, formatDate } from '../utils/documentHelpers.js';
+import { REFUND_POLICY_TIMING_LABEL, REFUND_POLICY_SEASONS, REFUND_POLICY_ROWS } from '../utils/refundPolicy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -99,6 +100,45 @@ function listItem(doc, text, W, ordered, idx) {
     .text(`${bullet}${text}`, ML + 10, doc.y, { width: W - 10, lineGap: 2 })
     .moveDown(0.05);
   resetX(doc);
+}
+
+/**
+ * 단순 표 — 첫 열은 왼쪽, 나머지 열은 오른쪽 정렬.
+ * widths 는 W 대비 비율. 표가 페이지 끝에 걸리면 통째로 다음 페이지에서 시작한다.
+ */
+function table(doc, W, head, rows, widths) {
+  const ROW_H = 18;
+  const PAD = 6;
+  let left = ML;
+  const xs = widths.map((w) => { const x = left; left += W * w; return x; });
+  const line = (y, color) => doc.moveTo(ML, y).lineTo(ML + W, y).strokeColor(color).lineWidth(0.5).stroke();
+
+  resetX(doc);
+  doc.moveDown(0.3);
+  if (doc.y + ROW_H * (rows.length + 1) > doc.page.height - doc.page.margins.bottom) doc.addPage();
+  let y = doc.y;
+
+  const drawRow = (cells, isHead) => {
+    if (isHead) doc.rect(ML, y, W, ROW_H).fill('#f5f5f5');
+    doc.font(isHead ? FONT_BOLD : FONT_REGULAR).fontSize(9).fillColor(isHead ? '#111111' : '#333333');
+    const textY = y + (ROW_H - doc.currentLineHeight()) / 2;
+    cells.forEach((text, i) => {
+      doc.text(String(text), xs[i] + PAD, textY, {
+        width: W * widths[i] - PAD * 2,
+        align: i === 0 ? 'left' : 'right',
+      });
+    });
+    y += ROW_H;
+    line(y, isHead ? '#cccccc' : '#e5e5e5');
+  };
+
+  line(y, '#cccccc');
+  drawRow(head, true);
+  rows.forEach((cells) => drawRow(cells, false));
+
+  doc.y = y;
+  resetX(doc);
+  doc.moveDown(0.4);
 }
 
 function divider(doc, W) {
@@ -261,17 +301,22 @@ export async function buildContractPdf(reservation) {
 
   // 제2조
   sectionTitle(doc, '제2조 취소 및 환불 규정', W);
-  body(doc, '대관일 기준 45일 전까지는 전액 환불이 가능합니다.', W);
-  body(doc, '대관일 기준 45일 이후에는 원칙적으로 취소 및 환불이 불가합니다.', W);
-  note(doc, '※ 9월부터 12월까지의 성수기 일정은 예약 확정 후 대관자 사유로 인한 취소, 일정 변경 및 환불이 불가합니다.', W);
-  body(doc, '다만 아래 사유에 해당하는 경우에는 예외적으로 환불이 가능합니다.', W);
+  body(doc, '대관자 사유로 예약을 취소하는 경우, 취소 접수 시점에 따라 아래 기준으로 환불합니다.', W);
+  table(
+    doc, W,
+    [REFUND_POLICY_TIMING_LABEL, ...REFUND_POLICY_SEASONS.map((s) => `${s.label} (${s.period})`)],
+    REFUND_POLICY_ROWS.map((row) => [row.timing, ...REFUND_POLICY_SEASONS.map((s) => `${row[s.id]}%`)]),
+    [0.5, 0.25, 0.25],
+  );
+  note(doc, '※ 취소 접수 시점은 대관일을 기준으로 산정하며, 일반기와 성수기는 대관일이 속한 월을 기준으로 구분합니다.', W);
+  body(doc, '다만 아래 사유에 해당하는 경우에는 위 기준과 관계없이 예외적으로 환불이 가능합니다.', W);
   [
     '스페이스홍 측 사유로 대관 진행이 불가능한 경우',
     '공간 사용이 객관적으로 불가능한 수준의 시설 안전상 하자가 발생한 경우',
     '천재지변, 재난, 행정명령 등 불가항력으로 대관 진행이 불가능한 경우',
     '기타 스페이스홍이 환불 사유로 인정하는 경우',
   ].forEach((t, i) => listItem(doc, t, W, true, i + 1));
-  body(doc, '다음과 같은 대관자 측 사유로 인한 취소는 환불 대상에 포함되지 않습니다.', W);
+  body(doc, '다음과 같은 대관자 측 사유로 인한 취소는 예외 사유에 해당하지 않으며, 위 환불 기준을 따릅니다.', W);
   const cancelReasons = ['단순 변심'];
   if (!isStudio) { cancelReasons.push('관객 수 감소 / 티켓 판매 부진', '출연진 변경'); }
   cancelReasons.push(`${activityWord} 준비 미흡`, '개인 사정 / 외부업체 사정', '일정 착오');

@@ -16,9 +16,9 @@ export const TIME_CONSTANTS = {
 };
 
 // 최소 대관 시간 — 프론트 rentalPricing.js(RATE_SEASONS)와 같은 값을 유지해야 함
-const PEAK_MONTHS = [10, 11, 12];
-const MIN_HOURS_BY_VENUE = { performance: 5, event: 5, studio: 4 };
-const PEAK_WEEKEND_MIN_HOURS = 7;
+export const PEAK_MONTHS = [10, 11, 12];
+export const MIN_HOURS_BY_VENUE = { performance: 5, event: 5, studio: 4 };
+export const PEAK_WEEKEND_MIN_HOURS = 7;
 
 /**
  * 대관 유형·날짜별 최소 대관 시간

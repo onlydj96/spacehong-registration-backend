@@ -16,16 +16,6 @@ export const OPTION_LABELS = {
 };
 
 /**
- * 금액을 "N만원" 형식으로 포맷
- * @param {number} amount - 원 단위 금액
- * @returns {string}
- */
-export function formatKRW(amount) {
-  const man = amount / 10000;
-  return `${man % 1 === 0 ? man : man.toFixed(1)}만원`;
-}
-
-/**
  * 날짜 문자열을 "YYYY년 M월 D일 (요일)" 형식으로 포맷
  * @param {string} dateStr - YYYY-MM-DD 형식
  * @returns {string}

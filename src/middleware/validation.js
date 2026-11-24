@@ -36,7 +36,7 @@ const ALLOWED_VENUE_TYPES = (process.env.ALLOWED_VENUE_TYPES || 'performance,eve
   .map(s => s.trim());
 
 const MAX_PERFORMERS = parseInt(process.env.MAX_PERFORMERS, 10) || 200;
-const MAX_OPERATOR_HOURS = parseInt(process.env.MAX_OPERATOR_HOURS, 10) || 12;
+const MAX_OPERATOR_HOURS = parseInt(process.env.MAX_OPERATOR_HOURS, 10) || TIME_CONSTANTS.MAX_RENTAL_HOURS;
 const MAX_NAME_LENGTH = parseInt(process.env.MAX_NAME_LENGTH, 10) || 50;
 const MAX_DESCRIPTION_LENGTH = parseInt(process.env.MAX_DESCRIPTION_LENGTH, 10) || 500;
 const MAX_SIGNATURE_SIZE = parseInt(process.env.MAX_SIGNATURE_SIZE, 10) || 500000; // 500KB (실제 바이트 기준)

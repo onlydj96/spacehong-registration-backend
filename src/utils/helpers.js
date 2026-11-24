@@ -12,7 +12,7 @@ export const OPTION_PRICES = {
 export const TIME_CONSTANTS = {
   MINUTES_PER_HOUR: 60,
   MIN_RENTAL_HOURS: 5,
-  MAX_RENTAL_HOURS: 12,
+  MAX_RENTAL_HOURS: 24, // 프론트 constants/index.js 의 MAX_RENTAL_HOURS 와 같은 값
 };
 
 // 최소 대관 시간 — 프론트 rentalPricing.js(RATE_SEASONS)와 같은 값을 유지해야 함

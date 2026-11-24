@@ -3,7 +3,7 @@ export const OPTION_PRICES = {
   extraCapacity: 100000,
   multitrack: 100000,
   personalMonitor: 100000,
-  keyboard: 70000,
+  keyboard: 50000,
   extraOperator: 20000,  // per hour
   drumCleanup: 100000,
 };

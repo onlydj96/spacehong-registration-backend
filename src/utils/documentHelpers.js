@@ -7,7 +7,7 @@ export const OPTION_LABELS = {
   opt_extra_capacity:   { label: '수용인원 50명 이상',        price: 100000 },
   opt_multitrack:       { label: '멀티트랙 녹음',            price: 100000 },
   opt_personal_monitor: { label: '퍼스널 모니터 / 인이어',   price: 100000 },
-  opt_keyboard:         { label: '키보드 추가 (Yamaha MODX6)', price: 70000 },
+  opt_keyboard:         { label: '키보드 추가 (Yamaha MODX6)', price: 50000 },
   opt_extra_operator:   { label: '추가 오퍼레이터',          price: null   },  // 시간당
   opt_drum_cleanup:     { label: '무대 드럼 정리',           price: 100000 },
   opt_bar_operation:    { label: '바 운영',                  price: 0      },

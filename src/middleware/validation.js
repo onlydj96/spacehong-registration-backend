@@ -219,7 +219,7 @@ export function validateReservation(req, res, next) {
   // termsAgreed 필수 검증
   const { termsAgreed } = req.body;
   if (termsAgreed !== true) {
-    errors.push('이용약관에 동의해주세요.');
+    errors.push('계약서에 동의해주세요.');
   }
 
   // signatureData 형식 검증 (Base64 Data URL 형식)

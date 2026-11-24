@@ -15,7 +15,7 @@ const router = Router();
 const RENTAL_STEP_NAMES = {
   0: '공간선택',
   1: '기본정보',
-  2: '약관동의',
+  2: '계약서동의',
   3: '옵션선택',
   4: 'FAQ',
   5: '최종확인',
